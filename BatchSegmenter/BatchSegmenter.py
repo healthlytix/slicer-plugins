@@ -103,8 +103,11 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         slicer.util.loadVolume(volFilename)
         slicer.util.loadLabelVolume(labelFilename)
         labelmapNodeName = os.path.splitext(os.path.basename(labelFilename))[0]
-        labelmapNode = slicer.util.getNode('ventr_mask_reg')
+        labelmapNode = slicer.util.getNode(labelmapNodeName)
+        volNodeName = os.path.splitext(os.path.basename(volFilename))[0]
+        volNode = slicer.util.getNode(volNodeName)
         segmentationNode = slicer.vtkMRMLSegmentationNode()
+        segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(volNode)
         slicer.mrmlScene.AddNode(segmentationNode)
         slicer.modules.segmentations.logic().ImportLabelmapToSegmentationNode(labelmapNode, segmentationNode)
 

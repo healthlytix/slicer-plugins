@@ -43,7 +43,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
 
         # Text area for volume name
         self.volumeNameLineEdit = qt.QLineEdit()
-        dataFormLayout.addRow(qt.QLabel('   Volume Name:'), self.volumeNameLineEdit)
+        dataFormLayout.addRow(qt.QLabel('    Volume Name:'), self.volumeNameLineEdit)
 
         # Text area for label volume name
         self.labelNameLineEdit = qt.QLineEdit()
@@ -52,7 +52,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         # Combobox to display selected folders
         self.dataCombobox = qt.QComboBox()
         self.dataCombobox.enabled = False
-        dataFormLayout.addRow(qt.QLabel('Selected Volume:'), self.dataCombobox)
+        dataFormLayout.addRow(qt.QLabel('    Active Volume:'), self.dataCombobox)
 
         # Select Directories Button
         self.selectDataButton = qt.QPushButton("Load Data")
@@ -80,34 +80,33 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.selectDataButton.connect('clicked(bool)', self.onSelectDataButton)
         self.dataCombobox.connect('currentIndexChanged(const QString&)', self.onComboboxChanged)
 
-        ### TEMP - for development ###
+        # ### TEMP - for development ###
         self.volumeNameLineEdit.text = 'ctvol_reg.mgh'  
         self.labelNameLineEdit.text = 'ventr_mask_reg.mgh'
-        self.logic.selectedImageDict = {'ctcopilot00065': ('/Users/brian/Desktop/datasets/lv_segmentation/outputs/ctcopilot00065/ctvol_reg.mgh', '/Users/brian/Desktop/datasets/lv_segmentation/outputs/ctcopilot00065/ctvol_reg.mgh')}
+        self.logic.selectedImageDict = {'ctcopilot00065': ('/Users/brian/Desktop/datasets/lv_segmentation/manual_segs/ctcopilot00065/ctvol_reg.mgh', '/Users/brian/Desktop/datasets/lv_segmentation/manual_segs/ctcopilot00065/ventr_mask_reg.mgh')}
         self.dataCombobox.addItem('ctcopilot00065')
         self.dataCombobox.enabled = True
 
-    # def saveOpenData(self):
-    #     node = slicer.util.getNode('MR-head')
-    #     slicer.util.saveNode(node, filename)
+    # def saveData(self):
+    #     slicer.modules.segmentations.logic().ExportSegmentsToLabelmapNode(seg, ids, labelmapVolumeNode, reference)
+    #     slicer.util.saveNode(slicer.util.getNode('MR-head'), filename)
 
     def onComboboxChanged(self, text):
         # TODO: make sure previous data is saved!!!
         slicer.mrmlScene.Clear(0)
         try:
-            volName, labelName = self.logic.selectedImageDict[text]
+            volFilename, labelFilename = self.logic.selectedImageDict[text]
         except KeyError:
             print('Could not find %s among selected images' % text)
             return
 
-        """
-        slicer.util has functions:
-        loadLabelVolume
-        loadVolume
-        """
-        
-        print('load vol', volName)
-        print('load label', labelName)
+        slicer.util.loadVolume(volFilename)
+        slicer.util.loadLabelVolume(labelFilename)
+        labelmapNodeName = os.path.splitext(os.path.basename(labelFilename))[0]
+        labelmapNode = slicer.util.getNode('ventr_mask_reg')
+        segmentationNode = slicer.vtkMRMLSegmentationNode()
+        slicer.mrmlScene.AddNode(segmentationNode)
+        slicer.modules.segmentations.logic().ImportLabelmapToSegmentationNode(labelmapNode, segmentationNode)
 
         
 
@@ -153,6 +152,8 @@ class BatchSegmenterLogic(ScriptedLoadableModuleLogic):
 
     def selectValidFolders(self, candidateFolders, volName, labelName):
         candidateFolders = sorted(candidateFolders, key=lambda f: os.path.basename(f))
+        self.volName = volName
+        self.labelName = labelName
         self.selectedImageDict = OrderedDict()
         for folder in candidateFolders:
             caseVolName = os.path.join(folder, volName)

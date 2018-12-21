@@ -63,14 +63,20 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
 
         #### Segmentation Area ####
 
-        segCollapsibleButton = ctk.ctkCollapsibleButton()
-        segCollapsibleButton.text = 'Segmentation'
-        segCollapsibleButton.collapsed = True
-        self.layout.addWidget(segCollapsibleButton)
+        self.segCollapsibleButton = ctk.ctkCollapsibleButton()
+        self.segCollapsibleButton.text = 'Segmentation'
+        self.segCollapsibleButton.collapsed = True
+        self.layout.addWidget(self.segCollapsibleButton)
 
         # Layout within the dummy collapsible button
-        segFormLayout = qt.QFormLayout(segCollapsibleButton)
-        segFormLayout.addRow(slicer.qMRMLSegmentEditorWidget())
+        segFormLayout = qt.QFormLayout(self.segCollapsibleButton)
+        self.segEditorWidget = slicer.qMRMLSegmentEditorWidget()
+        self.segEditorWidget.setMRMLScene(slicer.mrmlScene)
+        self.segmentEditorNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentEditorNode")
+        self.segEditorWidget.setMRMLSegmentEditorNode(self.segmentEditorNode)
+        self.segEditorWidget.enabled = True
+        segFormLayout.addRow(self.segEditorWidget)
+
 
         # Add vertical spacer
         self.layout.addStretch(1)
@@ -86,6 +92,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.logic.selectedImageDict = {'ctcopilot00065': ('/Users/brian/Desktop/datasets/lv_segmentation/manual_segs/ctcopilot00065/ctvol_reg.mgh', '/Users/brian/Desktop/datasets/lv_segmentation/manual_segs/ctcopilot00065/ventr_mask_reg.mgh')}
         self.dataCombobox.addItem('ctcopilot00065')
         self.dataCombobox.enabled = True
+        self.segCollapsibleButton.collapsed = False
 
     # def saveData(self):
     #     slicer.modules.segmentations.logic().ExportSegmentsToLabelmapNode(seg, ids, labelmapVolumeNode, reference)
@@ -100,17 +107,30 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             print('Could not find %s among selected images' % text)
             return
 
+        # TODO: if there's not labelFilename, create empty seg:
+        # addedSegmentID = segmentationNode.GetSegmentation().AddEmptySegment('seg name')
+
+        # create vol/label nodes
         slicer.util.loadVolume(volFilename)
         slicer.util.loadLabelVolume(labelFilename)
         labelmapNodeName = os.path.splitext(os.path.basename(labelFilename))[0]
         labelmapNode = slicer.util.getNode(labelmapNodeName)
         volNodeName = os.path.splitext(os.path.basename(volFilename))[0]
         volNode = slicer.util.getNode(volNodeName)
+
+        # create segmentation node
         segmentationNode = slicer.vtkMRMLSegmentationNode()
         segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(volNode)
         slicer.mrmlScene.AddNode(segmentationNode)
         slicer.modules.segmentations.logic().ImportLabelmapToSegmentationNode(labelmapNode, segmentationNode)
+        slicer.mrmlScene.RemoveNode(labelmapNode)
 
+        # add segmentation node to segmentation widget
+        self.segEditorWidget.setEnabled(True)
+        self.segEditorWidget.setMasterVolumeNode(volNode)
+        self.segEditorWidget.setSegmentationNode(segmentationNode)
+        segmentationNode.CreateClosedSurfaceRepresentation()
+        self.segCollapsibleButton.collapsed = False
         
 
     def onSelectDataButton(self):

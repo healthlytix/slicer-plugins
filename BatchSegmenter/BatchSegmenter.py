@@ -55,10 +55,20 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         dataFormLayout.addRow(qt.QLabel('    Active Volume:'), self.dataCombobox)
 
         # Select Directories Button
-        self.selectDataButton = qt.QPushButton("Load Data")
-        self.selectDataButton.toolTip = "Select data directories."
+        self.selectDataButton = qt.QPushButton('Load Data')
+        self.selectDataButton.toolTip = '"Select data directories.'
         self.selectDataButton.enabled = True
         dataFormLayout.addRow(self.selectDataButton)
+
+        # Save button
+        saveButtonLayout = qt.QHBoxLayout()
+        self.saveSegButton = qt.QPushButton('Save Seg.')
+        self.saveSegButton.enabled = False
+        saveButtonLayout.addWidget(self.saveSegButton)
+        self.autosaveCheckbox = qt.QCheckBox('Autosave')
+        self.autosaveCheckbox.setMaximumSize(self.autosaveCheckbox.sizeHint)
+        saveButtonLayout.addWidget(self.autosaveCheckbox)
+        dataFormLayout.addRow(saveButtonLayout)
 
 
         #### Segmentation Area ####
@@ -85,24 +95,39 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         ### connections ###
         self.selectDataButton.connect('clicked(bool)', self.onSelectDataButton)
         self.dataCombobox.connect('currentIndexChanged(const QString&)', self.onComboboxChanged)
+        self.autosaveCheckbox.connect('stateChanged (int)', self.onAutosaveChanged)
+        self.saveSegButton.connect('clicked(bool)', self.onSaveSegButtonPressed)
 
-        # ### TEMP - for development ###
+        # # ### TEMP - for development ###
         self.volumeNameLineEdit.text = 'ctvol_reg.mgh'  
         self.labelNameLineEdit.text = 'ventr_mask_reg.mgh'
-        self.logic.selectedImageDict = {'ctcopilot00065': ('/Users/brian/Desktop/datasets/lv_segmentation/manual_segs/ctcopilot00065/ctvol_reg.mgh', '/Users/brian/Desktop/datasets/lv_segmentation/manual_segs/ctcopilot00065/ventr_mask_reg.mgh')}
-        self.dataCombobox.addItem('ctcopilot00065')
-        self.dataCombobox.enabled = True
-        self.segCollapsibleButton.collapsed = False
+        # self.logic.imageDict = {'ctcopilot00065': ('/Users/brian/Desktop/temp_dataset/ctcopilot00065/ctvol_reg.mgh', '/Users/brian/Desktop/temp_dataset/ctcopilot00065/ventr_mask_reg.mgh')}
+        # self.dataCombobox.addItem('ctcopilot00065')
+        # self.dataCombobox.enabled = True
+        # self.segCollapsibleButton.collapsed = True
+        # self.saveSegButton.enabled = True
+        # self.autosaveCheckbox.setCheckState(2)
 
-    # def saveData(self):
-    #     slicer.modules.segmentations.logic().ExportSegmentsToLabelmapNode(seg, ids, labelmapVolumeNode, reference)
-    #     slicer.util.saveNode(slicer.util.getNode('MR-head'), filename)
+    
+    def onAutosaveChanged(self, isChecked):
+        self.saveSegButton.enabled = isChecked==0
+        
+
+    def onSaveSegButtonPressed(self):
+        caseName = self.dataCombobox.currentText
+        _, labelFilename = self.logic.imageDict[caseName]
+        print('Save to', labelFilename)
+
+
+        # slicer.vtkSlicerSegmentationsModuleLogic.ExportSegmentsToLabelmapNode(seg, ids, labelmapVolumeNode, reference)
+        # slicer.util.saveNode(slicer.util.getNode('MR-head'), filename)
+
 
     def onComboboxChanged(self, text):
         # TODO: make sure previous data is saved!!!
         slicer.mrmlScene.Clear(0)
         try:
-            volFilename, labelFilename = self.logic.selectedImageDict[text]
+            volFilename, labelFilename = self.logic.imageDict[text]
         except KeyError:
             print('Could not find %s among selected images' % text)
             return
@@ -116,21 +141,25 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         labelmapNodeName = os.path.splitext(os.path.basename(labelFilename))[0]
         labelmapNode = slicer.util.getNode(labelmapNodeName)
         volNodeName = os.path.splitext(os.path.basename(volFilename))[0]
-        volNode = slicer.util.getNode(volNodeName)
-
+        self.volNode = slicer.util.getNode(volNodeName)
+        
         # create segmentation node
-        segmentationNode = slicer.vtkMRMLSegmentationNode()
-        segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(volNode)
-        slicer.mrmlScene.AddNode(segmentationNode)
-        slicer.modules.segmentations.logic().ImportLabelmapToSegmentationNode(labelmapNode, segmentationNode)
+        self.segmentationNode = slicer.vtkMRMLSegmentationNode()
+        self.segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(self.volNode)
+        slicer.mrmlScene.AddNode(self.segmentationNode)
+        slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmapNode, self.segmentationNode)
         slicer.mrmlScene.RemoveNode(labelmapNode)
 
         # add segmentation node to segmentation widget
         self.segEditorWidget.setEnabled(True)
-        self.segEditorWidget.setMasterVolumeNode(volNode)
-        self.segEditorWidget.setSegmentationNode(segmentationNode)
-        segmentationNode.CreateClosedSurfaceRepresentation()
-        self.segCollapsibleButton.collapsed = False
+        self.segEditorWidget.setSegmentationNode(self.segmentationNode)
+        self.segEditorWidget.setMasterVolumeNode(self.volNode)
+        self.segmentationNode.CreateClosedSurfaceRepresentation()
+        # self.segCollapsibleButton.collapsed = False
+
+        if ~self.autosaveCheckbox.isChecked():
+            self.saveSegButton.enabled = True
+
         
 
     def onSelectDataButton(self):
@@ -177,14 +206,17 @@ class BatchSegmenterLogic(ScriptedLoadableModuleLogic):
         candidateFolders = sorted(candidateFolders, key=lambda f: os.path.basename(f))
         self.volName = volName
         self.labelName = labelName
-        self.selectedImageDict = OrderedDict()
+        self.imageDict = OrderedDict()
+        if not self.volName or not self.labelName:
+            print('Error: you should specify vol/label vol filenames')
+            return
         for folder in candidateFolders:
             caseVolName = os.path.join(folder, volName)
             caseLabelName = os.path.join(folder, labelName)
             caseName = os.path.basename(folder)
             if os.path.exists(caseVolName) and os.path.exists(caseLabelName):
-                self.selectedImageDict[caseName] = (caseVolName, caseLabelName)
-        return self.selectedImageDict
+                self.imageDict[caseName] = (caseVolName, caseLabelName)
+        return self.imageDict
 
 
     def hasImageData(self,volumeNode):

@@ -1,4 +1,5 @@
 import os
+from glob import glob
 import unittest
 from collections import OrderedDict
 import vtk, qt, ctk, slicer
@@ -13,10 +14,10 @@ class BatchSegmenter(ScriptedLoadableModule):
 
     def __init__(self, parent):
         ScriptedLoadableModule.__init__(self, parent)
-        self.parent.title = "Batch Segmentation" # TODO make this more human readable by adding spaces
+        self.parent.title = "Batch Segmentation Editor"
         self.parent.categories = ["Segmentation"]
         self.parent.dependencies = []
-        self.parent.contributors = ["Brian Keating (Healthlytix)"] # replace with "Firstname Lastname (Organization)"
+        self.parent.contributors = ["Brian Keating (Healthlytix)"]
         self.parent.helpText = """"""
         self.parent.helpText += self.getDefaultModuleDocumentationLink()
         self.parent.acknowledgementText = """"""
@@ -38,38 +39,32 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         dataCollapsibleButton.text = 'Select Data'
         self.layout.addWidget(dataCollapsibleButton)
 
-        # Layout within the dummy collapsible button
+        # Layout within the collapsible button
         dataFormLayout = qt.QFormLayout(dataCollapsibleButton)
 
         # Text area for volume name
-        self.volumeNameLineEdit = qt.QLineEdit()
-        dataFormLayout.addRow(qt.QLabel('    Volume Name:'), self.volumeNameLineEdit)
+        self.imageNamesLineEdit = qt.QLineEdit()
+        dataFormLayout.addRow(qt.QLabel('Image Names:'), self.imageNamesLineEdit)
 
         # Text area for label volume name
-        self.labelNameLineEdit = qt.QLineEdit()
-        dataFormLayout.addRow(qt.QLabel('Label Vol. Name:'), self.labelNameLineEdit)
+        self.labelNamesLineEdit = qt.QLineEdit()
+        dataFormLayout.addRow(qt.QLabel('Label Names:'), self.labelNamesLineEdit)
 
         # Combobox to display selected folders
         self.dataCombobox = qt.QComboBox()
         self.dataCombobox.enabled = False
-        dataFormLayout.addRow(qt.QLabel('    Active Volume:'), self.dataCombobox)
+        dataFormLayout.addRow(qt.QLabel('Active Volume:'), self.dataCombobox)
 
-        # Select Directories Button
-        self.selectDataButton = qt.QPushButton('Load Data')
-        self.selectDataButton.toolTip = '"Select data directories.'
-        self.selectDataButton.enabled = True
-        dataFormLayout.addRow(self.selectDataButton)
+        # Navigate images buttons
+        navigateImagesLayout = qt.QHBoxLayout()
+        self.nextImageButton = qt.QPushButton('Next Image')
+        self.nextImageButton.enabled = False
+        navigateImagesLayout.addWidget(self.nextImageButton)
 
-        # Save button
-        saveButtonLayout = qt.QHBoxLayout()
-        self.saveSegButton = qt.QPushButton('Save Seg.')
-        self.saveSegButton.enabled = False
-        saveButtonLayout.addWidget(self.saveSegButton)
-        self.autosaveCheckbox = qt.QCheckBox('Autosave')
-        self.autosaveCheckbox.setMaximumSize(self.autosaveCheckbox.sizeHint)
-        saveButtonLayout.addWidget(self.autosaveCheckbox)
-        dataFormLayout.addRow(saveButtonLayout)
-
+        self.previousImageButton = qt.QPushButton('Previous Image')
+        self.previousImageButton.enabled = False
+        navigateImagesLayout.addWidget(self.previousImageButton)
+        dataFormLayout.addRow(navigateImagesLayout)
 
         #### Segmentation Area ####
 
@@ -86,42 +81,56 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.segEditorWidget.setMRMLSegmentEditorNode(self.segmentEditorNode)
         self.segEditorWidget.enabled = True
         segFormLayout.addRow(self.segEditorWidget)
-
-
+        
         # Add vertical spacer
         self.layout.addStretch(1)
 
         
         ### connections ###
-        self.selectDataButton.connect('clicked(bool)', self.onSelectDataButton)
+        self.imageNamesLineEdit.connect('editingFinished()', self.loadImageLabelDict)
+        self.labelNamesLineEdit.connect('editingFinished()', self.loadImageLabelDict)
         self.dataCombobox.connect('currentIndexChanged(const QString&)', self.onComboboxChanged)
-        self.autosaveCheckbox.connect('stateChanged (int)', self.onAutosaveChanged)
-        self.saveSegButton.connect('clicked(bool)', self.onSaveSegButtonPressed)
 
+
+        ### Logic ###
+        self.image_label_dict = {}
+        
         # # ### TEMP - for development ###
-        self.volumeNameLineEdit.text = 'ctvol_reg.mgh'  
-        self.labelNameLineEdit.text = 'ventr_mask_reg.mgh'
+        self.imageNamesLineEdit.text = '/Users/brian/apps/slicer-batch-segmentation/data/images/*.mgz'
+        self.labelNamesLineEdit.text = '/Users/brian/apps/slicer-batch-segmentation/data/prostate_segs/*.mgz'
         # self.logic.imageDict = {'ctcopilot00065': ('/Users/brian/Desktop/temp_dataset/ctcopilot00065/ctvol_reg.mgh', '/Users/brian/Desktop/temp_dataset/ctcopilot00065/ventr_mask_reg.mgh')}
-        # self.dataCombobox.addItem('ctcopilot00065')
         # self.dataCombobox.enabled = True
-        # self.segCollapsibleButton.collapsed = True
         # self.saveSegButton.enabled = True
-        # self.autosaveCheckbox.setCheckState(2)
-
+        self.loadImageLabelDict()
+        
     
+    def loadImageLabelDict(self):
+        image_fn_pattern = self.imageNamesLineEdit.text
+        image_fns = sorted(glob(self.imageNamesLineEdit.text))
+        label_fn_pattern = self.imageNamesLineEdit.text
+        label_fns = sorted(glob(self.labelNamesLineEdit.text))
+        label_dict = {os.path.splitext(os.path.basename(fn))[0]: fn for fn in label_fns}
+        for image_fn in image_fns:
+            case_name = os.path.splitext(os.path.basename(image_fn))[0]
+            if case_name in label_dict:
+                label_fn = label_dict[case_name]
+                self.image_label_dict[case_name] = image_fn, label_fn
+                print(image_fn, label_fn)
+        
+    
+
     def onAutosaveChanged(self, isChecked):
         self.saveSegButton.enabled = isChecked==0
         
 
     def onSaveSegButtonPressed(self):
-        caseName = self.dataCombobox.currentText
-        _, labelFilename = self.logic.imageDict[caseName]
-        print('Save to', labelFilename)
-
-
-        # slicer.vtkSlicerSegmentationsModuleLogic.ExportSegmentsToLabelmapNode(seg, ids, labelmapVolumeNode, reference)
-        # slicer.util.saveNode(slicer.util.getNode('MR-head'), filename)
-
+        if not hasattr(self, 'labelmapNode'):
+            print('No label map loaded, nothing to save')
+            return
+        print('Saving seg to ', self.labelFilename)
+        slicer.modules.segmentations.logic().ExportAllSegmentsToLabelmapNode(self.segmentationNode, self.labelmapNode)
+        slicer.util.saveNode(self.labelmapNode, self.labelFilename)
+        
 
     def onComboboxChanged(self, text):
         # TODO: make sure previous data is saved!!!
@@ -135,21 +144,37 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         # TODO: if there's not labelFilename, create empty seg:
         # addedSegmentID = segmentationNode.GetSegmentation().AddEmptySegment('seg name')
 
+        aSegmentationIsLoaded = hasattr(self, 'segmentationNode')
+        if aSegmentationIsLoaded and self.autosaveCheckbox.isChecked():
+            self.onSaveSegButtonPressed()
+        
         # create vol/label nodes
-        slicer.util.loadVolume(volFilename)
-        slicer.util.loadLabelVolume(labelFilename)
-        labelmapNodeName = os.path.splitext(os.path.basename(labelFilename))[0]
-        labelmapNode = slicer.util.getNode(labelmapNodeName)
-        volNodeName = os.path.splitext(os.path.basename(volFilename))[0]
-        self.volNode = slicer.util.getNode(volNodeName)
+        [success, self.volNode] = slicer.util.loadVolume(volFilename, returnNode=True)
+        if not success:
+            print('Failed to load volume ', volFilename)
+            return
+        [success, self.labelmapNode] = slicer.util.loadLabelVolume(labelFilename, returnNode=True)
+        if success:
+            self.labelFilename = labelFilename
+        else:
+            print('Failed to load label volume ', labelFilename)
+            return
+        
+        # set window level
+        # TODO: let user set it manually, then copy windowing when volume is changed
+        displayNode = self.volNode.GetDisplayNode()
+        displayNode.AutoWindowLevelOff()
+        displayNode.SetLevel(40)
+        displayNode.SetWindow(80)
         
         # create segmentation node
-        self.segmentationNode = slicer.vtkMRMLSegmentationNode()
+        self.segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode', 'segmentationNode')
         self.segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(self.volNode)
+        self.segmentationNode.CreateDefaultDisplayNodes()
         slicer.mrmlScene.AddNode(self.segmentationNode)
-        slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmapNode, self.segmentationNode)
-        slicer.mrmlScene.RemoveNode(labelmapNode)
-
+        slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(self.labelmapNode, self.segmentationNode)
+        # slicer.mrmlScene.RemoveNode(labelmapNode)
+        
         # add segmentation node to segmentation widget
         self.segEditorWidget.setEnabled(True)
         self.segEditorWidget.setSegmentationNode(self.segmentationNode)

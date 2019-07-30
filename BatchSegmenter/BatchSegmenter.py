@@ -187,25 +187,36 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             return
                 
         # create segmentation node
-        self.segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode', 'segmentationNode')
+        try:
+            slicer.mrmlScene.RemoveNode(self.segmentationNode)
+            del self.segmentationNode
+        except:
+            pass
+        self.segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode', 'Prostate Segmentation')
         self.segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(self.volNode)
         self.segmentationNode.CreateDefaultDisplayNodes()
         slicer.mrmlScene.AddNode(self.segmentationNode)
         slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmapNode, self.segmentationNode)
         slicer.mrmlScene.RemoveNode(labelmapNode)
         
-        # # add segmentation node to segmentation widget
-        # self.segEditorWidget.setEnabled(True)
-        # self.segEditorWidget.setSegmentationNode(self.segmentationNode)
-        # self.segEditorWidget.setMasterVolumeNode(self.volNode)
-        # self.segmentationNode.CreateClosedSurfaceRepresentation()
-        # self.segCollapsibleButton.collapsed = False
+        # add segmentation node to segmentation widget
+        self.segEditorWidget.setEnabled(True)
+        self.segEditorWidget.setSegmentationNode(self.segmentationNode)
+        self.segEditorWidget.setMasterVolumeNode(self.volNode)
+        self.segmentationNode.CreateClosedSurfaceRepresentation()
+        self.segCollapsibleButton.collapsed = False
             
 
     def saveActiveSegmentation(self):
         if self.active_label_fn:
-            print('Save to', self.active_label_fn)
-
+            print('Saving seg to', self.active_label_fn)
+            visibleSegmentIds = vtk.vtkStringArray()
+            self.segmentationNode.GetDisplayNode().GetVisibleSegmentIDs(visibleSegmentIds)
+            labelmapNode = slicer.vtkMRMLLabelMapVolumeNode()
+            slicer.mrmlScene.AddNode(labelmapNode)
+            slicer.vtkSlicerSegmentationsModuleLogic.ExportSegmentsToLabelmapNode(self.segmentationNode, visibleSegmentIds, labelmapNode, self.volNode)
+            slicer.util.saveNode(labelmapNode, self.active_label_fn)
+            
 
     def cleanup(self):
         pass

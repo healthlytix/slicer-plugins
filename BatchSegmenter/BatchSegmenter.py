@@ -77,10 +77,16 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         segFormLayout = qt.QFormLayout(self.segCollapsibleButton)
         self.segEditorWidget = slicer.qMRMLSegmentEditorWidget()
         self.segEditorWidget.setMRMLScene(slicer.mrmlScene)
-        self.segmentEditorNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentEditorNode")
+        self.segmentEditorNode = slicer.vtkMRMLSegmentEditorNode()
+        slicer.mrmlScene.AddNode(self.segmentEditorNode)
         self.segEditorWidget.setMRMLSegmentEditorNode(self.segmentEditorNode)
         self.segEditorWidget.enabled = True
+        self.segEditorWidget.setSwitchToSegmentationsButtonVisible(False)
+        # self.segEditorWidget.setSegmentationNodeSelectorVisible(False)
+        # self.segEditorWidget.setMasterVolumeNodeSelectorVisible(False)
+        self.segEditorWidget.setReadOnly(False)
         segFormLayout.addRow(self.segEditorWidget)
+
         
         # Add vertical spacer
         self.layout.addStretch(1)
@@ -201,11 +207,15 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         
         # add segmentation node to segmentation widget
         self.segEditorWidget.setEnabled(True)
-        self.segEditorWidget.setSegmentationNode(self.segmentationNode)
         self.segEditorWidget.setMasterVolumeNode(self.volNode)
+        self.segEditorWidget.setSegmentationNode(self.segmentationNode)
         self.segmentationNode.CreateClosedSurfaceRepresentation()
         self.segCollapsibleButton.collapsed = False
-            
+        visibleSegmentIds = vtk.vtkStringArray()
+        self.segmentationNode.GetDisplayNode().GetVisibleSegmentIDs(visibleSegmentIds)
+        self.segEditorWidget.setCurrentSegmentID(visibleSegmentIds.GetValue(0))
+        self.segEditorWidget.updateWidgetFromMRML()
+        
 
     def saveActiveSegmentation(self):
         if self.active_label_fn:

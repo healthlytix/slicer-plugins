@@ -41,13 +41,17 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         # Layout within the collapsible button
         dataFormLayout = qt.QFormLayout(dataCollapsibleButton)
 
-        # Text area for volume name
-        self.imageNamesLineEdit = qt.QLineEdit()
-        dataFormLayout.addRow(qt.QLabel('Image Names:'), self.imageNamesLineEdit)
+        # Select data Button
+        self.selectDataButton = qt.QPushButton('Select Data')
+        self.selectDataButton.toolTip = 'Select directory containing mgz files.'
+        self.selectDataButton.enabled = True
+        dataFormLayout.addRow(qt.QLabel('Image Names:'), self.selectDataButton)
 
         # Text area for label volume name
-        self.labelNamesLineEdit = qt.QLineEdit()
-        dataFormLayout.addRow(qt.QLabel('Label Names:'), self.labelNamesLineEdit)
+        self.selectLabelsButton = qt.QPushButton('Select Labels')
+        self.selectLabelsButton.toolTip = 'Select directory containing mgz files.'
+        self.selectLabelsButton.enabled = True
+        dataFormLayout.addRow(qt.QLabel('Label Names:'), self.selectLabelsButton)
 
         # Combobox to display selected folders
         self.imageComboBox = qt.QComboBox()
@@ -69,8 +73,8 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.layout.addStretch(1)
         
         ### connections ###
-        self.imageNamesLineEdit.connect('editingFinished()', self.updateImageList)
-        self.labelNamesLineEdit.connect('editingFinished()', self.updateImageList)
+        self.selectDataButton.clicked.connect(self.onSelectDataButtonPressed)
+        self.selectLabelsButton.clicked.connect(self.onSelectLabelsButtonPressed)
         self.previousImageButton.connect('clicked(bool)', self.previousImage)
         self.nextImageButton.connect('clicked(bool)', self.nextImage)
         self.imageComboBox.connect('currentIndexChanged(const QString&)', self.onComboboxChanged)
@@ -79,19 +83,37 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.image_label_dict = OrderedDict()
         self.selected_image_ind = None
         self.active_label_fn = None
+        self.labelFolder = None
+        self.dataFolder = None
         
         ### TEMP - for development ###
-        self.imageNamesLineEdit.text = '/Users/brian/apps/slicer-batch-segmentation/data/images/*.mgz'
-        self.labelNamesLineEdit.text = '/Users/brian/apps/slicer-batch-segmentation/data/prostate_segs/*.mgz'
-        self.updateImageList()
         
+        
+    def onSelectDataButtonPressed(self):
+        file_dialog = qt.QFileDialog(None, 'Select Data Folder')
+        file_dialog.setFileMode(qt.QFileDialog.DirectoryOnly)
+        file_dialog.setOption(qt.QFileDialog.DontUseNativeDialog, True)
+        file_view = file_dialog.findChild(qt.QListView, 'listView')
+        if file_dialog.exec_():
+            self.dataFolder = file_dialog.selectedFiles()[0]
+            self.updateImageList()
+
+    def onSelectLabelsButtonPressed(self):
+        file_dialog = qt.QFileDialog(None, 'Select Label Folder')
+        file_dialog.setFileMode(qt.QFileDialog.DirectoryOnly)
+        file_dialog.setOption(qt.QFileDialog.DontUseNativeDialog, True)
+        file_view = file_dialog.findChild(qt.QListView, 'listView')
+        if file_dialog.exec_():
+            self.labelFolder = file_dialog.selectedFiles()[0]
+            self.updateImageList()
     
     def updateImageList(self):
         """Load matching image-label pairs into a dict, update widgets appropriately"""
-        image_fn_pattern = self.imageNamesLineEdit.text
-        image_fns = sorted(glob(self.imageNamesLineEdit.text))
-        label_fn_pattern = self.imageNamesLineEdit.text
-        label_fns = sorted(glob(self.labelNamesLineEdit.text))
+        if not self.dataFolder or not self.labelFolder:
+            return
+        
+        image_fns = sorted(glob(os.path.join(self.dataFolder, '*')))
+        label_fns = sorted(glob(os.path.join(self.labelFolder, '*')))
         label_dict = {os.path.splitext(os.path.basename(fn))[0]: fn for fn in label_fns}
         self.image_label_dict = OrderedDict()
         for image_fn in image_fns:

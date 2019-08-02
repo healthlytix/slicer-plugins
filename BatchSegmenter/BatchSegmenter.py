@@ -65,32 +65,8 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         navigateImagesLayout.addWidget(self.nextImageButton)
         dataFormLayout.addRow(navigateImagesLayout)
 
-
-        #### Segmentation Area ####
-
-        self.segCollapsibleButton = ctk.ctkCollapsibleButton()
-        self.segCollapsibleButton.text = 'Segmentation'
-        self.segCollapsibleButton.collapsed = True
-        self.layout.addWidget(self.segCollapsibleButton)
-
-        # Layout within the dummy collapsible button
-        segFormLayout = qt.QFormLayout(self.segCollapsibleButton)
-        self.segEditorWidget = slicer.qMRMLSegmentEditorWidget()
-        self.segEditorWidget.setMRMLScene(slicer.mrmlScene)
-        self.segmentEditorNode = slicer.vtkMRMLSegmentEditorNode()
-        slicer.mrmlScene.AddNode(self.segmentEditorNode)
-        self.segEditorWidget.setMRMLSegmentEditorNode(self.segmentEditorNode)
-        self.segEditorWidget.enabled = True
-        self.segEditorWidget.setSwitchToSegmentationsButtonVisible(False)
-        # self.segEditorWidget.setSegmentationNodeSelectorVisible(False)
-        # self.segEditorWidget.setMasterVolumeNodeSelectorVisible(False)
-        self.segEditorWidget.setReadOnly(False)
-        segFormLayout.addRow(self.segEditorWidget)
-
-        
-        # Add vertical spacer
+        # Add vertical spacer to keep widgets near top
         self.layout.addStretch(1)
-
         
         ### connections ###
         self.imageNamesLineEdit.connect('editingFinished()', self.updateImageList)
@@ -98,7 +74,6 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.previousImageButton.connect('clicked(bool)', self.previousImage)
         self.nextImageButton.connect('clicked(bool)', self.nextImage)
         self.imageComboBox.connect('currentIndexChanged(const QString&)', self.onComboboxChanged)
-
 
         ### Logic ###
         self.image_label_dict = OrderedDict()
@@ -204,17 +179,6 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         slicer.mrmlScene.AddNode(self.segmentationNode)
         slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmapNode, self.segmentationNode)
         slicer.mrmlScene.RemoveNode(labelmapNode)
-        
-        # add segmentation node to segmentation widget
-        self.segEditorWidget.setEnabled(True)
-        self.segEditorWidget.setMasterVolumeNode(self.volNode)
-        self.segEditorWidget.setSegmentationNode(self.segmentationNode)
-        self.segmentationNode.CreateClosedSurfaceRepresentation()
-        self.segCollapsibleButton.collapsed = False
-        visibleSegmentIds = vtk.vtkStringArray()
-        self.segmentationNode.GetDisplayNode().GetVisibleSegmentIDs(visibleSegmentIds)
-        self.segEditorWidget.setCurrentSegmentID(visibleSegmentIds.GetValue(0))
-        self.segEditorWidget.updateWidgetFromMRML()
         
 
     def saveActiveSegmentation(self):

@@ -57,9 +57,9 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         dataFormLayout.addRow(qt.QLabel('Folder Names:'), self.selectDataButton)
 
         # Combobox to display selected folders
-        self.imageComboBox = qt.QComboBox()
-        self.imageComboBox.enabled = False
-        dataFormLayout.addRow(qt.QLabel('Active Volume:'), self.imageComboBox)
+        self.caseComboBox = qt.QComboBox()
+        self.caseComboBox.enabled = False
+        dataFormLayout.addRow(qt.QLabel('Active Volume:'), self.caseComboBox)
 
         # Navigate images buttons
         navigateImagesLayout = qt.QHBoxLayout()
@@ -79,7 +79,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.selectDataButton.clicked.connect(self.onSelectDataButtonPressed)
         self.previousImageButton.connect('clicked(bool)', self.previousImage)
         self.nextImageButton.connect('clicked(bool)', self.nextImage)
-        self.imageComboBox.connect('currentIndexChanged(const QString&)', self.onComboboxChanged)
+        self.caseComboBox.connect('currentIndexChanged(const QString&)', self.onComboboxChanged)
 
         ### Logic ###
         self.image_label_dict = OrderedDict()
@@ -118,37 +118,23 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
                 self.selectDataButton.setText(str(len(self.image_label_dict))+' cases')
             elif len(self.image_label_dict) == 1:
                 self.selectDataButton.setText(os.path.basename(self.image_label_dict.keys()[0]))
+            self.updateCaseCombobox()
 
-            # self.updateImageList()
 
-
-    def updateImageList(self):
-        """Load matching image-label pairs into a dict, update widgets appropriately"""
-        if not self.image_label_dict:
-            return
-        
-        image_fns = glob(os.path.join(self.dataFolder, '*'))
-        label_fns = sorted(glob(os.path.join(self.labelFolder, '*')))
-        label_dict = {os.path.splitext(os.path.basename(fn))[0]: fn for fn in label_fns}
-        self.image_label_dict = OrderedDict()
-        for image_fn in image_fns:
-            case_name = os.path.splitext(os.path.basename(image_fn))[0]
-            if case_name in label_dict:
-                label_fn = label_dict[case_name]
-                self.image_label_dict[case_name] = image_fn, label_fn
-
-        self.imageComboBox.clear()
-        self.active_label_fn = None
+    # def updateImageList(self):
+    def updateCaseCombobox(self):
+        """Load selected valid case names into the widget"""
+        self.caseComboBox.clear()
         if self.image_label_dict:
             case_names = list(self.image_label_dict.keys())
-            self.imageComboBox.addItems(case_names)  # load names into combobox
-            self.imageComboBox.enabled = True
+            self.caseComboBox.addItems(case_names)  # load names into combobox
+            self.caseComboBox.enabled = True
             self.nextImageButton.enabled = True
             self.previousImageButton.enabled = True
             self.selected_image_ind = 0
-            self.active_label_fn = self.image_label_dict[case_names[0]][1]
         else:
-            self.imageComboBox.enabled = False
+            self.selectDataButton.setText('Select Data Folders')
+            self.caseComboBox.enabled = False
             self.nextImageButton.enabled = False
             self.previousImageButton.enabled = False
             self.selected_image_ind = None
@@ -159,14 +145,14 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.selected_image_ind += 1
         if self.selected_image_ind > len(self.image_label_dict) - 1:
             self.selected_image_ind -= len(self.image_label_dict)
-        self.imageComboBox.setCurrentIndex(self.selected_image_ind)
+        self.caseComboBox.setCurrentIndex(self.selected_image_ind)
 
 
     def previousImage(self):
         self.selected_image_ind -= 1
         if self.selected_image_ind < 0:
             self.selected_image_ind += len(self.image_label_dict)
-        self.imageComboBox.setCurrentIndex(self.selected_image_ind)
+        self.caseComboBox.setCurrentIndex(self.selected_image_ind)
 
 
     def onComboboxChanged(self, text):

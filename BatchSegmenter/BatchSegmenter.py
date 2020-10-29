@@ -54,7 +54,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.selectDataButton = qt.QPushButton('Select Data Folders')
         self.selectDataButton.toolTip = 'Select directory containing nifti/mgz files.'
         self.selectDataButton.enabled = True
-        dataFormLayout.addRow(qt.QLabel('Image Names:'), self.selectDataButton)
+        dataFormLayout.addRow(qt.QLabel('Folder Names:'), self.selectDataButton)
 
         # Combobox to display selected folders
         self.imageComboBox = qt.QComboBox()
@@ -102,29 +102,32 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             f_tree_view.setSelectionMode(qt.QAbstractItemView.MultiSelection)
         if file_dialog.exec_():
             data_folders = file_dialog.selectedFiles()
-            self.data_folders = []
+            self.image_label_dict = OrderedDict()
             for data_folder in data_folders:
                 folder_ims = [glob(os.path.join(data_folder, im_fn)) for im_fn in IMAGE_PATTERNS]
                 has_required_ims = all(len(ims)==1 for ims in folder_ims)
                 has_label = len(glob(os.path.join(data_folder, LABEL_PATTERN))) == 1
                 if has_required_ims and has_label:
-                    self.data_folders.append(data_folder)
+                    folder_name = os.path.basename(data_folder)
+                    im_fns = [ims[0] for ims in folder_ims]
+                    label_fn = glob(os.path.join(data_folder, LABEL_PATTERN))[0]
+                    self.image_label_dict[folder_name] = im_fns, label_fn
                 else:
                     print('WARNING: Skipping '+data_folder+' because it is missing (or contains multiple) required input images')
-            if len(self.data_folders) > 1:
-                self.selectDataButton.setText(str(len(self.data_folders))+' cases')
-            elif len(self.data_folders) == 1:
-                self.selectDataButton.setText(os.path.basename(self.data_folders[0]))
+            if len(self.image_label_dict) > 1:
+                self.selectDataButton.setText(str(len(self.image_label_dict))+' cases')
+            elif len(self.image_label_dict) == 1:
+                self.selectDataButton.setText(os.path.basename(self.image_label_dict.keys()[0]))
 
             # self.updateImageList()
 
 
     def updateImageList(self):
         """Load matching image-label pairs into a dict, update widgets appropriately"""
-        if not self.dataFolder or not self.labelFolder:
+        if not self.image_label_dict:
             return
         
-        image_fns = sorted(glob(os.path.join(self.dataFolder, '*')))
+        image_fns = glob(os.path.join(self.dataFolder, '*'))
         label_fns = sorted(glob(os.path.join(self.labelFolder, '*')))
         label_dict = {os.path.splitext(os.path.basename(fn))[0]: fn for fn in label_fns}
         self.image_label_dict = OrderedDict()

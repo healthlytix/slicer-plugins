@@ -7,6 +7,15 @@ from slicer.ScriptedLoadableModule import *
 import logging
 
 
+IMAGE_PATTERNS = [
+    'BraTS20_Training_???_t1ce.nii.gz',
+    'BraTS20_Training_???_t2.nii.gz',
+    'BraTS20_Training_???_flair.nii.gz',
+    'BraTS20_Training_???_t1.nii.gz'
+]
+LABEL_PATTERN = 'BraTS20_Training_???_seg.nii.gz'
+
+
 class BatchSegmenter(ScriptedLoadableModule):
     """Uses ScriptedLoadableModule base class, available at:
     https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
@@ -42,16 +51,10 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         dataFormLayout = qt.QFormLayout(dataCollapsibleButton)
 
         # Select data Button
-        self.selectDataButton = qt.QPushButton('Select Data')
-        self.selectDataButton.toolTip = 'Select directory containing mgz files.'
+        self.selectDataButton = qt.QPushButton('Select Data Folders')
+        self.selectDataButton.toolTip = 'Select directory containing nifti/mgz files.'
         self.selectDataButton.enabled = True
         dataFormLayout.addRow(qt.QLabel('Image Names:'), self.selectDataButton)
-
-        # Text area for label volume name
-        self.selectLabelsButton = qt.QPushButton('Select Labels')
-        self.selectLabelsButton.toolTip = 'Select directory containing mgz files.'
-        self.selectLabelsButton.enabled = True
-        dataFormLayout.addRow(qt.QLabel('Label Names:'), self.selectLabelsButton)
 
         # Combobox to display selected folders
         self.imageComboBox = qt.QComboBox()
@@ -74,7 +77,6 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         
         ### connections ###
         self.selectDataButton.clicked.connect(self.onSelectDataButtonPressed)
-        self.selectLabelsButton.clicked.connect(self.onSelectLabelsButtonPressed)
         self.previousImageButton.connect('clicked(bool)', self.previousImage)
         self.nextImageButton.connect('clicked(bool)', self.nextImage)
         self.imageComboBox.connect('currentIndexChanged(const QString&)', self.onComboboxChanged)
@@ -83,30 +85,40 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.image_label_dict = OrderedDict()
         self.selected_image_ind = None
         self.active_label_fn = None
-        self.labelFolder = None
-        self.dataFolder = None
-        
-        ### TEMP - for development ###
+        self.dataFolders = None
         
         
     def onSelectDataButtonPressed(self):
-        file_dialog = qt.QFileDialog(None, 'Select Data Folder')
+        file_dialog = qt.QFileDialog(None, 'Select Data Folders')
         file_dialog.setFileMode(qt.QFileDialog.DirectoryOnly)
         file_dialog.setOption(qt.QFileDialog.DontUseNativeDialog, True)
+        file_dialog.setOption(qt.QFileDialog.ShowDirsOnly, True)
         file_view = file_dialog.findChild(qt.QListView, 'listView')
+        # make it possible to select multiple directories:
+        if file_view:
+            file_view.setSelectionMode(qt.QAbstractItemView.MultiSelection)
+        f_tree_view = file_dialog.findChild(qt.QTreeView)
+        if f_tree_view:
+            f_tree_view.setSelectionMode(qt.QAbstractItemView.MultiSelection)
         if file_dialog.exec_():
-            self.dataFolder = file_dialog.selectedFiles()[0]
-            self.updateImageList()
+            data_folders = file_dialog.selectedFiles()
+            self.data_folders = []
+            for data_folder in data_folders:
+                folder_ims = [glob(os.path.join(data_folder, im_fn)) for im_fn in IMAGE_PATTERNS]
+                has_required_ims = all(len(ims)==1 for ims in folder_ims)
+                has_label = len(glob(os.path.join(data_folder, LABEL_PATTERN))) == 1
+                if has_required_ims and has_label:
+                    self.data_folders.append(data_folder)
+                else:
+                    print('WARNING: Skipping '+data_folder+' because it is missing (or contains multiple) required input images')
+            if len(self.data_folders) > 1:
+                self.selectDataButton.setText(str(len(self.data_folders))+' cases')
+            elif len(self.data_folders) == 1:
+                self.selectDataButton.setText(os.path.basename(self.data_folders[0]))
 
-    def onSelectLabelsButtonPressed(self):
-        file_dialog = qt.QFileDialog(None, 'Select Label Folder')
-        file_dialog.setFileMode(qt.QFileDialog.DirectoryOnly)
-        file_dialog.setOption(qt.QFileDialog.DontUseNativeDialog, True)
-        file_view = file_dialog.findChild(qt.QListView, 'listView')
-        if file_dialog.exec_():
-            self.labelFolder = file_dialog.selectedFiles()[0]
-            self.updateImageList()
-    
+            # self.updateImageList()
+
+
     def updateImageList(self):
         """Load matching image-label pairs into a dict, update widgets appropriately"""
         if not self.dataFolder or not self.labelFolder:

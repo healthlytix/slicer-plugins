@@ -86,6 +86,10 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.selected_image_ind = None
         self.active_label_fn = None
         self.dataFolders = None
+
+        ### DEBUG
+        self.image_label_dict = OrderedDict([(u'BraTS20_Training_262', ([u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_262/BraTS20_Training_262_t1ce.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_262/BraTS20_Training_262_t2.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_262/BraTS20_Training_262_flair.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_262/BraTS20_Training_262_t1.nii.gz'], u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_262/BraTS20_Training_262_seg.nii.gz')), (u'BraTS20_Training_263', ([u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_263/BraTS20_Training_263_t1ce.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_263/BraTS20_Training_263_t2.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_263/BraTS20_Training_263_flair.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_263/BraTS20_Training_263_t1.nii.gz'], u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_263/BraTS20_Training_263_seg.nii.gz')), (u'BraTS20_Training_278', ([u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_278/BraTS20_Training_278_t1ce.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_278/BraTS20_Training_278_t2.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_278/BraTS20_Training_278_flair.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_278/BraTS20_Training_278_t1.nii.gz'], u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_278/BraTS20_Training_278_seg.nii.gz')), (u'BraTS20_Training_326', ([u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_326/BraTS20_Training_326_t1ce.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_326/BraTS20_Training_326_t2.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_326/BraTS20_Training_326_flair.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_326/BraTS20_Training_326_t1.nii.gz'], u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_326/BraTS20_Training_326_seg.nii.gz'))])
+        self.updateWidgets()
         
         
     def onSelectDataButtonPressed(self):
@@ -114,16 +118,20 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
                     self.image_label_dict[folder_name] = im_fns, label_fn
                 else:
                     print('WARNING: Skipping '+data_folder+' because it is missing (or contains multiple) required input images')
-            if len(self.image_label_dict) > 1:
-                self.selectDataButton.setText(str(len(self.image_label_dict))+' cases')
-            elif len(self.image_label_dict) == 1:
-                self.selectDataButton.setText(os.path.basename(self.image_label_dict.keys()[0]))
-            self.updateCaseCombobox()
+            self.updateWidgets()
 
 
     # def updateImageList(self):
-    def updateCaseCombobox(self):
+    def updateWidgets(self):
         """Load selected valid case names into the widget"""
+
+        # select data button
+        if len(self.image_label_dict) > 1:
+            self.selectDataButton.setText(str(len(self.image_label_dict))+' cases')
+        elif len(self.image_label_dict) == 1:
+            self.selectDataButton.setText(os.path.basename(self.image_label_dict.keys()[0]))
+        
+        # case combobox
         self.caseComboBox.clear()
         if self.image_label_dict:
             case_names = list(self.image_label_dict.keys())
@@ -189,19 +197,22 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         if not success:
             print('Failed to load label volume ', label_fn)
             return
-                
-        # # create segmentation node
-        # try:
-        #     slicer.mrmlScene.RemoveNode(self.segmentationNode)
-        #     del self.segmentationNode
-        # except:
-        #     pass
-        # self.segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode', 'Prostate Segmentation')
-        # self.segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(self.volNode)
-        # self.segmentationNode.CreateDefaultDisplayNodes()
-        # slicer.mrmlScene.AddNode(self.segmentationNode)
-        # slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmapNode, self.segmentationNode)
-        # slicer.mrmlScene.RemoveNode(labelmapNode)
+        if len(self.volNodes) == 0:
+            print('Failed to load any volumes from folder '+text+'!')
+            return
+
+        # create segmentation node
+        try:
+            slicer.mrmlScene.RemoveNode(self.segmentationNode)
+            del self.segmentationNode
+        except:
+            pass
+        self.segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode', 'Tumor Segmentation')
+        self.segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(self.volNodes[0])
+        self.segmentationNode.CreateDefaultDisplayNodes()
+        slicer.mrmlScene.AddNode(self.segmentationNode)
+        slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmapNode, self.segmentationNode)
+        slicer.mrmlScene.RemoveNode(labelmapNode)
         
 
     def saveActiveSegmentation(self):

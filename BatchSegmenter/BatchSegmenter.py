@@ -201,6 +201,8 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             print('Failed to load any volumes from folder '+text+'!')
             return
 
+        print('DEBUG:', type(labelmapNode))
+
         # create segmentation node
         try:
             slicer.mrmlScene.RemoveNode(self.segmentationNode)
@@ -216,15 +218,14 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         
 
     def saveActiveSegmentation(self):
-        print('TODO: save the active segmentation!!!!')
-        # if self.active_label_fn:
-        #     print('Saving seg to', self.active_label_fn)
-        #     visibleSegmentIds = vtk.vtkStringArray()
-        #     self.segmentationNode.GetDisplayNode().GetVisibleSegmentIDs(visibleSegmentIds)
-        #     labelmapNode = slicer.vtkMRMLLabelMapVolumeNode()
-        #     slicer.mrmlScene.AddNode(labelmapNode)
-        #     slicer.vtkSlicerSegmentationsModuleLogic.ExportSegmentsToLabelmapNode(self.segmentationNode, visibleSegmentIds, labelmapNode, self.volNode)
-        #     slicer.util.saveNode(labelmapNode, self.active_label_fn)
+        if self.active_label_fn:
+            print('Saving seg to', self.active_label_fn)
+            visibleSegmentIds = vtk.vtkStringArray()
+            self.segmentationNode.GetDisplayNode().GetVisibleSegmentIDs(visibleSegmentIds)
+            labelmapNode = slicer.vtkMRMLLabelMapVolumeNode()
+            slicer.mrmlScene.AddNode(labelmapNode)
+            slicer.vtkSlicerSegmentationsModuleLogic.ExportSegmentsToLabelmapNode(self.segmentationNode, visibleSegmentIds, labelmapNode, self.volNodes[0])
+            slicer.util.saveNode(labelmapNode, self.active_label_fn)
             
 
     def cleanup(self):

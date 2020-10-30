@@ -87,9 +87,9 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.active_label_fn = None
         self.dataFolders = None
 
-        # ### DEBUG
-        # self.image_label_dict = OrderedDict([(u'BraTS20_Training_262', ([u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_262/BraTS20_Training_262_t1ce.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_262/BraTS20_Training_262_t2.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_262/BraTS20_Training_262_flair.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_262/BraTS20_Training_262_t1.nii.gz'], u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_262/BraTS20_Training_262_seg.nii.gz')), (u'BraTS20_Training_263', ([u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_263/BraTS20_Training_263_t1ce.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_263/BraTS20_Training_263_t2.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_263/BraTS20_Training_263_flair.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_263/BraTS20_Training_263_t1.nii.gz'], u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_263/BraTS20_Training_263_seg.nii.gz')), (u'BraTS20_Training_278', ([u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_278/BraTS20_Training_278_t1ce.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_278/BraTS20_Training_278_t2.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_278/BraTS20_Training_278_flair.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_278/BraTS20_Training_278_t1.nii.gz'], u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_278/BraTS20_Training_278_seg.nii.gz')), (u'BraTS20_Training_326', ([u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_326/BraTS20_Training_326_t1ce.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_326/BraTS20_Training_326_t2.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_326/BraTS20_Training_326_flair.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_326/BraTS20_Training_326_t1.nii.gz'], u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_326/BraTS20_Training_326_seg.nii.gz'))])
-        # self.updateWidgets()
+        ### DEBUG
+        self.image_label_dict = OrderedDict([(u'BraTS20_Training_262', ([u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_262/BraTS20_Training_262_t1ce.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_262/BraTS20_Training_262_t2.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_262/BraTS20_Training_262_flair.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_262/BraTS20_Training_262_t1.nii.gz'], u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_262/BraTS20_Training_262_seg.nii.gz')), (u'BraTS20_Training_263', ([u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_263/BraTS20_Training_263_t1ce.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_263/BraTS20_Training_263_t2.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_263/BraTS20_Training_263_flair.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_263/BraTS20_Training_263_t1.nii.gz'], u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_263/BraTS20_Training_263_seg.nii.gz')), (u'BraTS20_Training_278', ([u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_278/BraTS20_Training_278_t1ce.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_278/BraTS20_Training_278_t2.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_278/BraTS20_Training_278_flair.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_278/BraTS20_Training_278_t1.nii.gz'], u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_278/BraTS20_Training_278_seg.nii.gz')), (u'BraTS20_Training_326', ([u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_326/BraTS20_Training_326_t1ce.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_326/BraTS20_Training_326_t2.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_326/BraTS20_Training_326_flair.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_326/BraTS20_Training_326_t1.nii.gz'], u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_326/BraTS20_Training_326_seg.nii.gz'))])
+        self.updateWidgets()
         
         
     def onSelectDataButtonPressed(self):
@@ -185,14 +185,32 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
 
         # TODO: if there's not label_fn, create empty seg
         
-        # create vol/label nodes
+        # create vol nodes
         self.volNodes = []
         for im_fn in im_fns:
+            
             [success, vol_node] = slicer.util.loadVolume(im_fn, returnNode=True)
+            vol_node.GetScalarVolumeDisplayNode().SetInterpolate(0)
             if success:
                 self.volNodes.append(vol_node)
             else:
                 print('WARNING: Failed to load volume ', im_fn)
+            
+        # configure views
+        view_names = ['Red', 'Yellow' 'Green']
+        for vol_node, view_name in zip(self.volNodes, view_names):
+            view = slicer.app.layoutManager().sliceWidget('Red')
+            view.sliceLogic().GetSliceCompositeNode().SetBackgroundVolumeID(vol_node.GetID())
+            view.sliceLogic().GetSliceCompositeNode().SetLinkedControl(True)
+            view.mrmlSliceNode().RotateToVolumePlane(vol_node)
+            view.sliceController().setSliceVisible(True)  # show in 3d view
+
+        # set red/green/yellow views to axial orientation
+        sliceNodes = slicer.util.getNodesByClass('vtkMRMLSliceNode')
+        for sliceNode in sliceNodes:
+            sliceNode.SetOrientationToAxial()
+
+        # create label node as a labelVolume
         [success, labelmapNode] = slicer.util.loadLabelVolume(label_fn, returnNode=True)
         if not success:
             print('Failed to load label volume ', label_fn)
@@ -201,9 +219,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             print('Failed to load any volumes from folder '+text+'!')
             return
 
-        print('DEBUG:', type(labelmapNode))
-
-        # create segmentation node
+        # create segmentation node from labelVolume
         try:
             slicer.mrmlScene.RemoveNode(self.segmentationNode)
             del self.segmentationNode

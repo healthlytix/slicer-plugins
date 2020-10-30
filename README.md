@@ -20,3 +20,9 @@ I followed [the instructions here](https://na-mic.org/wiki/2013_Project_Week_Bre
 Slicer includes a "developer mode" that allows you to reload your module without restarting the application. To turn it on, select from the menu `Edit > Application Settings`, choose "Developer" from the side bar and check the two boxes.
 
 Helpful code snippets: https://www.slicer.org/wiki/Documentation/Nightly/ScriptRepository#Segmentations
+
+## TODO
+
+* Load different images in different views, all in axial orientation
+* Give human-readable names to the segments
+* Scroll to tumor center?

@@ -201,7 +201,6 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         for im_fn in im_fns:
             [success, vol_node] = slicer.util.loadVolume(im_fn, returnNode=True)
             vol_node.GetScalarVolumeDisplayNode().SetInterpolate(0)
-            print(type(vol_node.GetScalarVolumeDisplayNode()))
             if success:
                 self.volNodes.append(vol_node)
             else:
@@ -230,7 +229,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.segmentationNode.CreateDefaultDisplayNodes()
         slicer.mrmlScene.AddNode(self.segmentationNode)
         slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmapNode, self.segmentationNode)
-        
+                
 
     def saveActiveSegmentation(self):
         if self.active_label_fn:

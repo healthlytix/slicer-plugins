@@ -98,15 +98,19 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.selectDataButton.clicked.connect(self.onSelectDataButtonPressed)
         self.previousImageButton.connect('clicked(bool)', self.previousImage)
         self.nextImageButton.connect('clicked(bool)', self.nextImage)
-        # self.caseComboBox.connect('currentIndexChanged(const QString&)', self.onComboboxChanged)
+        self.caseComboBox.connect('currentIndexChanged(const QString&)', self.onComboboxChanged)
 
         ### Logic ###
         self.image_label_dict = OrderedDict()
         self.selected_image_ind = None
         self.active_label_fn = None
         self.dataFolders = None
-        
-        
+
+        ### DEBUG
+        self.image_label_dict = OrderedDict([(u'BraTS20_Training_262', ([u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_262/BraTS20_Training_262_t1ce.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_262/BraTS20_Training_262_t2.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_262/BraTS20_Training_262_flair.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_262/BraTS20_Training_262_t1.nii.gz'], u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_262/BraTS20_Training_262_seg.nii.gz')), (u'BraTS20_Training_263', ([u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_263/BraTS20_Training_263_t1ce.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_263/BraTS20_Training_263_t2.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_263/BraTS20_Training_263_flair.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_263/BraTS20_Training_263_t1.nii.gz'], u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_263/BraTS20_Training_263_seg.nii.gz')), (u'BraTS20_Training_278', ([u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_278/BraTS20_Training_278_t1ce.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_278/BraTS20_Training_278_t2.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_278/BraTS20_Training_278_flair.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_278/BraTS20_Training_278_t1.nii.gz'], u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_278/BraTS20_Training_278_seg.nii.gz')), (u'BraTS20_Training_326', ([u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_326/BraTS20_Training_326_t1ce.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_326/BraTS20_Training_326_t2.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_326/BraTS20_Training_326_flair.nii.gz', u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_326/BraTS20_Training_326_t1.nii.gz'], u'/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_326/BraTS20_Training_326_seg.nii.gz'))])
+        self.updateWidgets()
+
+
     def onSelectDataButtonPressed(self):
         file_dialog = qt.QFileDialog(None, 'Select Data Folders')
         file_dialog.setFileMode(qt.QFileDialog.DirectoryOnly)
@@ -136,7 +140,6 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             self.updateWidgets()
 
 
-    # def updateImageList(self):
     def updateWidgets(self):
         """Load selected valid case names into the widget"""
 
@@ -163,7 +166,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             self.selected_image_ind = None
             self.active_label_fn = None
 
-    
+
     def nextImage(self):
         self.selected_image_ind += 1
         if self.selected_image_ind > len(self.image_label_dict) - 1:
@@ -190,7 +193,6 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         except ValueError:
             return
 
-        slicer.mrmlScene.Clear(0)
         try:
             im_fns, label_fn = self.image_label_dict[text]
         except KeyError:
@@ -218,11 +220,6 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmap_node, self.segmentationNode)
         self.segEditorWidget.setSegmentationNode(self.segmentationNode)
         slicer.mrmlScene.RemoveNode(labelmap_node)
-
-        self.segEditorWidget.setMasterVolumeNodeID(vol_node.GetID())
-        print('DEBUG: ', vol_node.GetID())
-        print('DEBUG: ', self.segEditorWidget.masterVolumeNodeID())
-        print('holler')
 
 
         # # create label node as a labelVolume

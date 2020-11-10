@@ -82,6 +82,8 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.segEditorWidget.setMRMLSegmentEditorNode(segmentEditorNode)
         self.segEditorWidget.enabled = True
         self.segEditorWidget.setSwitchToSegmentationsButtonVisible(False)
+        self.segEditorWidget.setSegmentationNodeSelectorVisible(False)
+        self.segEditorWidget.setMasterVolumeNodeSelectorVisible(False)
         self.segEditorWidget.setReadOnly(False)
         segFormLayout.addRow(self.segEditorWidget)
 
@@ -254,4 +256,3 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
 
     def cleanup(self):
         pass
-        

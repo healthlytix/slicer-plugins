@@ -72,7 +72,26 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         navigateImagesLayout.addWidget(self.nextImageButton)
         dataFormLayout.addRow(navigateImagesLayout)
 
-        # Add vertical spacer to keep widgets near top
+        #### Segmentation Area ####
+
+        self.segCollapsibleButton = ctk.ctkCollapsibleButton()
+        self.segCollapsibleButton.text = 'Segmentation'
+        self.segCollapsibleButton.collapsed = False
+        self.layout.addWidget(self.segCollapsibleButton)
+
+        # Layout within the dummy collapsible button
+        segFormLayout = qt.QFormLayout(self.segCollapsibleButton)
+        self.segEditorWidget = slicer.qMRMLSegmentEditorWidget()
+        self.segEditorWidget.setMRMLScene(slicer.mrmlScene)
+        segmentEditorNode = slicer.vtkMRMLSegmentEditorNode()
+        slicer.mrmlScene.AddNode(segmentEditorNode)
+        self.segEditorWidget.setMRMLSegmentEditorNode(segmentEditorNode)
+        self.segEditorWidget.enabled = True
+        self.segEditorWidget.setSwitchToSegmentationsButtonVisible(False)
+        self.segEditorWidget.setReadOnly(False)
+        segFormLayout.addRow(self.segEditorWidget)
+
+        ## Add vertical spacer to keep widgets near top
         self.layout.addStretch(1)
         
         ### connections ###

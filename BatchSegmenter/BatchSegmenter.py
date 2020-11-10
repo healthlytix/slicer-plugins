@@ -255,4 +255,11 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             
 
     def cleanup(self):
-        pass
+        self.saveActiveSegmentation()
+        try:
+            slicer.mrmlScene.RemoveNode(self.segmentationNode)
+            del self.segmentationNode
+        except:
+            pass
+        slicer.mrmlScene.Clear(0)
+        

@@ -98,7 +98,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.selectDataButton.clicked.connect(self.onSelectDataButtonPressed)
         self.previousImageButton.connect('clicked(bool)', self.previousImage)
         self.nextImageButton.connect('clicked(bool)', self.nextImage)
-        self.caseComboBox.connect('currentIndexChanged(const QString&)', self.onComboboxChanged)
+        # self.caseComboBox.connect('currentIndexChanged(const QString&)', self.onComboboxChanged)
 
         ### Logic ###
         self.image_label_dict = OrderedDict()
@@ -205,45 +205,65 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         for sliceNode in sliceNodes:
             sliceNode.SetOrientationToAxial()
 
-        # create label node as a labelVolume
-        [success, labelmapNode] = slicer.util.loadLabelVolume(label_fn, returnNode=True)
-        if not success:
-            print('Failed to load label volume ', label_fn)
-            return
-        
-        # create vol nodes
-        self.volNodes = []
-        for im_fn in im_fns:
-            [success, vol_node] = slicer.util.loadVolume(im_fn, returnNode=True)
-            vol_node.GetScalarVolumeDisplayNode().SetInterpolate(0)
-            if success:
-                self.volNodes.append(vol_node)
-            else:
-                print('WARNING: Failed to load volume ', im_fn)
-        if len(self.volNodes) == 0:
-            print('Failed to load any volumes from folder '+text+'!')
-            return
 
-        # create segmentation node from labelVolume
-        try:
-            slicer.mrmlScene.RemoveNode(self.segmentationNode)
-            del self.segmentationNode
-        except:
-            pass
+        # DEBUG: try to add an editable segmentation
+        label_fn = '/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_278/BraTS20_Training_278_seg.nii.gz'
+        im_fn = '/Users/brian/Desktop/mislabeled-brats-cases/BraTS20_Training_278/BraTS20_Training_278_t1ce.nii.gz'
+        [_, vol_node] = slicer.util.loadVolume(im_fn, returnNode=True)
+        [_, labelmap_node] = slicer.util.loadLabelVolume(label_fn, returnNode=True)
         self.segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode', 'Tumor Segmentation')
-        self.segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(self.volNodes[0])
+        self.segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(vol_node)
         self.segmentationNode.CreateDefaultDisplayNodes()
         slicer.mrmlScene.AddNode(self.segmentationNode)
-        slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmapNode, self.segmentationNode)
+        slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmap_node, self.segmentationNode)
+        self.segEditorWidget.setSegmentationNode(self.segmentationNode)
+        slicer.mrmlScene.RemoveNode(labelmap_node)
+
+        self.segEditorWidget.setMasterVolumeNodeID(vol_node.GetID())
+        print('DEBUG: ', vol_node.GetID())
+        print('DEBUG: ', self.segEditorWidget.masterVolumeNodeID())
+        print('holler')
+
+
+        # # create label node as a labelVolume
+        # [success, labelmapNode] = slicer.util.loadLabelVolume(label_fn, returnNode=True)
+        # if not success:
+        #     print('Failed to load label volume ', label_fn)
+        #     return
         
-        # configure views
-        view_names = ['Red', 'Yellow', 'Green']
-        for vol_node, view_name in zip(self.volNodes, view_names):
-            view = slicer.app.layoutManager().sliceWidget(view_name)
-            view.sliceLogic().GetSliceCompositeNode().SetBackgroundVolumeID(vol_node.GetID())
-            view.sliceLogic().GetSliceCompositeNode().SetLinkedControl(True)
-            view.mrmlSliceNode().RotateToVolumePlane(vol_node)
-            view.sliceController().setSliceVisible(True)  # show in 3d view
+        # # create vol nodes
+        # self.volNodes = []
+        # for im_fn in im_fns:
+        #     [success, vol_node] = slicer.util.loadVolume(im_fn, returnNode=True)
+        #     vol_node.GetScalarVolumeDisplayNode().SetInterpolate(0)
+        #     if success:
+        #         self.volNodes.append(vol_node)
+        #     else:
+        #         print('WARNING: Failed to load volume ', im_fn)
+        # if len(self.volNodes) == 0:
+        #     print('Failed to load any volumes from folder '+text+'!')
+        #     return
+
+        # # create segmentation node from labelVolume
+        # try:
+        #     slicer.mrmlScene.RemoveNode(self.segmentationNode)
+        #     del self.segmentationNode
+        # except:
+        #     pass
+        # self.segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode', 'Tumor Segmentation')
+        # self.segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(self.volNodes[0])
+        # self.segmentationNode.CreateDefaultDisplayNodes()
+        # slicer.mrmlScene.AddNode(self.segmentationNode)
+        # slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmapNode, self.segmentationNode)
+        
+        # # configure views
+        # view_names = ['Red', 'Yellow', 'Green']
+        # for vol_node, view_name in zip(self.volNodes, view_names):
+        #     view = slicer.app.layoutManager().sliceWidget(view_name)
+        #     view.sliceLogic().GetSliceCompositeNode().SetBackgroundVolumeID(vol_node.GetID())
+        #     view.sliceLogic().GetSliceCompositeNode().SetLinkedControl(True)
+        #     view.mrmlSliceNode().RotateToVolumePlane(vol_node)
+        #     view.sliceController().setSliceVisible(True)  # show in 3d view
                 
 
     def saveActiveSegmentation(self):

@@ -2,6 +2,7 @@ import os
 from glob import glob
 import unittest
 from collections import OrderedDict
+import numpy as np
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import logging
@@ -14,7 +15,16 @@ IMAGE_PATTERNS = [
     'BraTS20_Training_???_t1.nii.gz'
 ]
 LABEL_PATTERN = 'BraTS20_Training_???_seg.nii.gz'
-
+LABEL_NAMES = {
+    1: 'necrotic / non-enhancing core',
+    2: 'peritumoral edema',
+    4: 'enhancing tumor'
+}
+LABEL_COLORS = {
+    1: (255,0,0),
+    2: (0,255,0),
+    4: (0,0,255)
+}
 
 class BatchSegmenter(ScriptedLoadableModule):
 
@@ -211,7 +221,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         if not success:
             print('Failed to load label volume ', label_fn)
             return
-        
+                
         # create vol nodes
         self.volNodes = []
         for im_fn in im_fns:
@@ -234,7 +244,22 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.segEditorWidget.setSegmentationNode(self.segmentationNode) 
         # self.segEditorWidget.setMasterVolumeNode(masterVolumeNode)
         slicer.mrmlScene.RemoveNode(labelmapNode)
-        
+
+        # set segment names
+        # FIXME: this will crash for non-numeric segment names
+        segmentation = self.segmentationNode.GetSegmentation()
+        segments = [segmentation.GetNthSegment(segInd) for segInd in range(segmentation.GetNumberOfSegments())]
+        for segment, (labelVal, labelName) in zip(segments, LABEL_NAMES.items()):
+            defaultSegName = segment.GetName()
+            try:
+                labelName = LABEL_NAMES[int(defaultSegName)]
+                color = np.array(LABEL_COLORS[int(defaultSegName)], float) / 255
+                segment.SetColor(color)
+                segment.SetName(labelName)
+            except (KeyError, ValueError):
+                print('ERROR: problem getting label name for segment named', defaultSegName)
+                continue
+          
         # configure views
         view_names = ['Red', 'Yellow', 'Green']
         for vol_node, view_name in zip(self.volNodes, view_names):
@@ -253,12 +278,15 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             labelmapNode = slicer.vtkMRMLLabelMapVolumeNode()
             slicer.mrmlScene.AddNode(labelmapNode)
             slicer.vtkSlicerSegmentationsModuleLogic.ExportSegmentsToLabelmapNode(self.segmentationNode, visibleSegmentIds, labelmapNode, self.volNodes[0])
-            slicer.util.saveNode(labelmapNode, self.active_label_fn)
+            # slicer.util.saveNode(labelmapNode, self.active_label_fn)
             slicer.mrmlScene.RemoveNode(labelmapNode)
             
 
     def cleanup(self):
-        self.saveActiveSegmentation()
+        try:
+            self.saveActiveSegmentation()
+        except:
+            pass
         try:
             slicer.mrmlScene.RemoveNode(self.segmentationNode)
             del self.segmentationNode

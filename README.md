@@ -23,6 +23,6 @@ Helpful code snippets: https://www.slicer.org/wiki/Documentation/Nightly/ScriptR
 
 ## TODO
 
-* Load different images in different views, all in axial orientation
 * Give human-readable names to the segments
+* standard seg editor keyboard shortcuts don't work. There's a snippet [here](https://www.slicer.org/wiki/Documentation/Nightly/ScriptRepository#Segmentations) showing how to do this for paint tool
 * Scroll to tumor center?

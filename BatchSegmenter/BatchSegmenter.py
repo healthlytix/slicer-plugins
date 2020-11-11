@@ -192,13 +192,19 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             return
         self.active_label_fn = label_fn
 
+        # remove existing nodes (if any)
+        if hasattr(self, 'volNodes'):
+            for volNode in self.volNodes:
+                slicer.mrmlScene.RemoveNode(volNode)
+        if hasattr(self, 'segmentationNode'):
+            slicer.mrmlScene.RemoveNode(self.segmentationNode)
+        
         # TODO: if there's not label_fn, create empty seg
         
         # set red/green/yellow views to axial orientation
         sliceNodes = slicer.util.getNodesByClass('vtkMRMLSliceNode')
         for sliceNode in sliceNodes:
             sliceNode.SetOrientationToAxial()
-
 
         # create label node as a labelVolume
         [success, labelmapNode] = slicer.util.loadLabelVolume(label_fn, returnNode=True)
@@ -220,11 +226,6 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             return
 
         # create segmentation node from labelVolume
-        try:
-            slicer.mrmlScene.RemoveNode(self.segmentationNode)
-            del self.segmentationNode
-        except:
-            pass
         self.segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode', 'Tumor Segmentation')
         self.segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(self.volNodes[0])
         self.segmentationNode.CreateDefaultDisplayNodes()
@@ -232,6 +233,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmapNode, self.segmentationNode)
         self.segEditorWidget.setSegmentationNode(self.segmentationNode) 
         # self.segEditorWidget.setMasterVolumeNode(masterVolumeNode)
+        slicer.mrmlScene.RemoveNode(labelmapNode)
         
         # configure views
         view_names = ['Red', 'Yellow', 'Green']
@@ -252,6 +254,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             slicer.mrmlScene.AddNode(labelmapNode)
             slicer.vtkSlicerSegmentationsModuleLogic.ExportSegmentsToLabelmapNode(self.segmentationNode, visibleSegmentIds, labelmapNode, self.volNodes[0])
             slicer.util.saveNode(labelmapNode, self.active_label_fn)
+            slicer.mrmlScene.RemoveNode(labelmapNode)
             
 
     def cleanup(self):

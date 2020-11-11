@@ -26,6 +26,9 @@ LABEL_COLORS = {
     4: (0,0,255)
 }
 
+LABEL_NAME_TO_LABEL_VAL = {val: key for key, val in LABEL_NAMES.items()}
+
+
 class BatchSegmenter(ScriptedLoadableModule):
 
     def __init__(self, parent):
@@ -249,17 +252,23 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         # FIXME: this will crash for non-numeric segment names
         segmentation = self.segmentationNode.GetSegmentation()
         segments = [segmentation.GetNthSegment(segInd) for segInd in range(segmentation.GetNumberOfSegments())]
-        for segment, (labelVal, labelName) in zip(segments, LABEL_NAMES.items()):
-            defaultSegName = segment.GetName()
-            try:
-                labelName = LABEL_NAMES[int(defaultSegName)]
-                color = np.array(LABEL_COLORS[int(defaultSegName)], float) / 255
-                segment.SetColor(color)
-                segment.SetName(labelName)
-            except (KeyError, ValueError):
-                print('ERROR: problem getting label name for segment named', defaultSegName)
-                continue
-          
+        segmentNameDict = {segment.GetName(): segment for segment in segments}
+        for labelVal, labelName in LABEL_NAMES.items():
+            color = np.array(LABEL_COLORS[labelVal], float) / 255
+            if str(labelVal) in segmentNameDict:
+                try:
+                    segment = segmentNameDict[str(labelVal)]
+                    defaultSegName = segment.GetName()
+                    labelName = LABEL_NAMES[int(defaultSegName)]
+                    segment.SetColor(color)
+                    segment.SetName(labelName)
+                except (KeyError, ValueError):
+                    print('ERROR: problem getting label name for segment named', defaultSegName)
+                    continue
+            else:  # label is missing from labelmap, create empty segment
+                print('Adding empty segment for class', labelName)
+                segmentation.AddEmptySegment('', labelName, color)
+
         # configure views
         view_names = ['Red', 'Yellow', 'Green']
         for vol_node, view_name in zip(self.volNodes, view_names):
@@ -272,6 +281,24 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
 
     def saveActiveSegmentation(self):
         if self.active_label_fn:
+
+            # # restore original label values
+            # segmentation = self.segmentationNode.GetSegmentation()
+            # for segInd in range(segmentation.GetNumberOfSegments()):
+            #     segment = segmentation.GetNthSegment(segInd)
+
+            # for segment, (labelVal, labelName) in zip(segments, LABEL_NAMES.items()):
+            #     defaultSegName = segment.GetName()
+            #     try:
+            #         labelName = LABEL_NAMES[int(defaultSegName)]
+            #         color = np.array(LABEL_COLORS[int(defaultSegName)], float) / 255
+            #         segment.SetColor(color)
+            #         segment.SetName(labelName)
+            #     except (KeyError, ValueError):
+            #         print('ERROR: problem getting label name for segment named', defaultSegName)
+            #         continue
+
+            # Save to file
             print('Saving seg to', self.active_label_fn)
             visibleSegmentIds = vtk.vtkStringArray()
             self.segmentationNode.GetDisplayNode().GetVisibleSegmentIDs(visibleSegmentIds)

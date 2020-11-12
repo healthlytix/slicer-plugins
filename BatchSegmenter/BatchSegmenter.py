@@ -282,21 +282,15 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
     def saveActiveSegmentation(self):
         if self.active_label_fn:
 
-            # # restore original label values
-            # segmentation = self.segmentationNode.GetSegmentation()
-            # for segInd in range(segmentation.GetNumberOfSegments()):
-            #     segment = segmentation.GetNthSegment(segInd)
-
-            # for segment, (labelVal, labelName) in zip(segments, LABEL_NAMES.items()):
-            #     defaultSegName = segment.GetName()
-            #     try:
-            #         labelName = LABEL_NAMES[int(defaultSegName)]
-            #         color = np.array(LABEL_COLORS[int(defaultSegName)], float) / 255
-            #         segment.SetColor(color)
-            #         segment.SetName(labelName)
-            #     except (KeyError, ValueError):
-            #         print('ERROR: problem getting label name for segment named', defaultSegName)
-            #         continue
+            # restore original label values
+            segmentation = self.segmentationNode.GetSegmentation()
+            for segInd in range(segmentation.GetNumberOfSegments()):
+                segment = segmentation.GetNthSegment(segInd)
+                try:
+                    labelVal = LABEL_NAME_TO_LABEL_VAL[segment.GetName()]
+                    segment.SetName(str(labelVal))
+                except KeyError:
+                    continue
 
             # Save to file
             print('Saving seg to', self.active_label_fn)
@@ -305,7 +299,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             labelmapNode = slicer.vtkMRMLLabelMapVolumeNode()
             slicer.mrmlScene.AddNode(labelmapNode)
             slicer.vtkSlicerSegmentationsModuleLogic.ExportSegmentsToLabelmapNode(self.segmentationNode, visibleSegmentIds, labelmapNode, self.volNodes[0])
-            # slicer.util.saveNode(labelmapNode, self.active_label_fn)
+            slicer.util.saveNode(labelmapNode, self.active_label_fn)
             slicer.mrmlScene.RemoveNode(labelmapNode)
             
 

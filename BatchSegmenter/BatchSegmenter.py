@@ -2,15 +2,34 @@ import os
 from glob import glob
 import unittest
 from collections import OrderedDict
+import numpy as np
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import logging
 
 
+IMAGE_PATTERNS = [
+    'BraTS20_Training_???_t1ce.nii.gz',
+    'BraTS20_Training_???_t2.nii.gz',
+    'BraTS20_Training_???_flair.nii.gz',
+    'BraTS20_Training_???_t1.nii.gz'
+]
+LABEL_PATTERN = 'BraTS20_Training_???_seg.nii.gz'
+LABEL_NAMES = {
+    1: 'necrotic / non-enhancing core',
+    2: 'peritumoral edema',
+    4: 'enhancing tumor'
+}
+LABEL_COLORS = {
+    1: (255,0,0),
+    2: (0,255,0),
+    4: (0,0,255)
+}
+
+LABEL_NAME_TO_LABEL_VAL = {val: key for key, val in LABEL_NAMES.items()}
+
+
 class BatchSegmenter(ScriptedLoadableModule):
-    """Uses ScriptedLoadableModule base class, available at:
-    https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
-    """
 
     def __init__(self, parent):
         ScriptedLoadableModule.__init__(self, parent)
@@ -24,9 +43,6 @@ class BatchSegmenter(ScriptedLoadableModule):
 
 
 class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
-    """Uses ScriptedLoadableModuleWidget base class, available at:
-    https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
-    """
 
     def setup(self):
         ScriptedLoadableModuleWidget.setup(self)
@@ -42,21 +58,15 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         dataFormLayout = qt.QFormLayout(dataCollapsibleButton)
 
         # Select data Button
-        self.selectDataButton = qt.QPushButton('Select Data')
-        self.selectDataButton.toolTip = 'Select directory containing mgz files.'
+        self.selectDataButton = qt.QPushButton('Select Data Folders')
+        self.selectDataButton.toolTip = 'Select directory containing nifti/mgz files.'
         self.selectDataButton.enabled = True
-        dataFormLayout.addRow(qt.QLabel('Image Names:'), self.selectDataButton)
-
-        # Text area for label volume name
-        self.selectLabelsButton = qt.QPushButton('Select Labels')
-        self.selectLabelsButton.toolTip = 'Select directory containing mgz files.'
-        self.selectLabelsButton.enabled = True
-        dataFormLayout.addRow(qt.QLabel('Label Names:'), self.selectLabelsButton)
+        dataFormLayout.addRow(qt.QLabel('Folder Names:'), self.selectDataButton)
 
         # Combobox to display selected folders
-        self.imageComboBox = qt.QComboBox()
-        self.imageComboBox.enabled = False
-        dataFormLayout.addRow(qt.QLabel('Active Volume:'), self.imageComboBox)
+        self.caseComboBox = qt.QComboBox()
+        self.caseComboBox.enabled = False
+        dataFormLayout.addRow(qt.QLabel('Active Folder:'), self.caseComboBox)
 
         # Navigate images buttons
         navigateImagesLayout = qt.QHBoxLayout()
@@ -69,89 +79,111 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         navigateImagesLayout.addWidget(self.nextImageButton)
         dataFormLayout.addRow(navigateImagesLayout)
 
-        # Add vertical spacer to keep widgets near top
+        #### Segmentation Area ####
+
+        self.segCollapsibleButton = ctk.ctkCollapsibleButton()
+        self.segCollapsibleButton.text = 'Segmentation'
+        self.segCollapsibleButton.collapsed = False
+        self.layout.addWidget(self.segCollapsibleButton)
+
+        # Layout within the dummy collapsible button
+        segFormLayout = qt.QFormLayout(self.segCollapsibleButton)
+        self.segEditorWidget = slicer.qMRMLSegmentEditorWidget()
+        self.segEditorWidget.setMRMLScene(slicer.mrmlScene)
+        segmentEditorNode = slicer.vtkMRMLSegmentEditorNode()
+        slicer.mrmlScene.AddNode(segmentEditorNode)
+        self.segEditorWidget.setMRMLSegmentEditorNode(segmentEditorNode)
+        self.segEditorWidget.enabled = True
+        self.segEditorWidget.setSwitchToSegmentationsButtonVisible(False)
+        self.segEditorWidget.setSegmentationNodeSelectorVisible(False)
+        self.segEditorWidget.setMasterVolumeNodeSelectorVisible(False)
+        self.segEditorWidget.setReadOnly(False)
+        segFormLayout.addRow(self.segEditorWidget)
+
+        ## Add vertical spacer to keep widgets near top
         self.layout.addStretch(1)
         
         ### connections ###
         self.selectDataButton.clicked.connect(self.onSelectDataButtonPressed)
-        self.selectLabelsButton.clicked.connect(self.onSelectLabelsButtonPressed)
         self.previousImageButton.connect('clicked(bool)', self.previousImage)
         self.nextImageButton.connect('clicked(bool)', self.nextImage)
-        self.imageComboBox.connect('currentIndexChanged(const QString&)', self.onComboboxChanged)
+        self.caseComboBox.connect('currentIndexChanged(const QString&)', self.onComboboxChanged)
 
         ### Logic ###
         self.image_label_dict = OrderedDict()
         self.selected_image_ind = None
         self.active_label_fn = None
-        self.labelFolder = None
-        self.dataFolder = None
-        
-        ### TEMP - for development ###
-        
-        
+        self.dataFolders = None
+
+
     def onSelectDataButtonPressed(self):
-        file_dialog = qt.QFileDialog(None, 'Select Data Folder')
+        file_dialog = qt.QFileDialog(None, 'Select Data Folders')
         file_dialog.setFileMode(qt.QFileDialog.DirectoryOnly)
         file_dialog.setOption(qt.QFileDialog.DontUseNativeDialog, True)
+        file_dialog.setOption(qt.QFileDialog.ShowDirsOnly, True)
         file_view = file_dialog.findChild(qt.QListView, 'listView')
+        # make it possible to select multiple directories:
+        if file_view:
+            file_view.setSelectionMode(qt.QAbstractItemView.MultiSelection)
+        f_tree_view = file_dialog.findChild(qt.QTreeView)
+        if f_tree_view:
+            f_tree_view.setSelectionMode(qt.QAbstractItemView.MultiSelection)
         if file_dialog.exec_():
-            self.dataFolder = file_dialog.selectedFiles()[0]
-            self.updateImageList()
+            data_folders = file_dialog.selectedFiles()
+            self.image_label_dict = OrderedDict()
+            for data_folder in data_folders:
+                folder_ims = [glob(os.path.join(data_folder, im_fn)) for im_fn in IMAGE_PATTERNS]
+                has_required_ims = all(len(ims)==1 for ims in folder_ims)
+                has_label = len(glob(os.path.join(data_folder, LABEL_PATTERN))) == 1
+                if has_required_ims and has_label:
+                    folder_name = os.path.basename(data_folder)
+                    im_fns = [ims[0] for ims in folder_ims]
+                    label_fn = glob(os.path.join(data_folder, LABEL_PATTERN))[0]
+                    self.image_label_dict[folder_name] = im_fns, label_fn
+                else:
+                    print('WARNING: Skipping '+data_folder+' because it is missing (or contains multiple) required input images')
+            self.updateWidgets()
 
-    def onSelectLabelsButtonPressed(self):
-        file_dialog = qt.QFileDialog(None, 'Select Label Folder')
-        file_dialog.setFileMode(qt.QFileDialog.DirectoryOnly)
-        file_dialog.setOption(qt.QFileDialog.DontUseNativeDialog, True)
-        file_view = file_dialog.findChild(qt.QListView, 'listView')
-        if file_dialog.exec_():
-            self.labelFolder = file_dialog.selectedFiles()[0]
-            self.updateImageList()
-    
-    def updateImageList(self):
-        """Load matching image-label pairs into a dict, update widgets appropriately"""
-        if not self.dataFolder or not self.labelFolder:
-            return
+
+    def updateWidgets(self):
+        """Load selected valid case names into the widget"""
+
+        # select data button
+        if len(self.image_label_dict) > 1:
+            self.selectDataButton.setText(str(len(self.image_label_dict))+' cases')
+        elif len(self.image_label_dict) == 1:
+            self.selectDataButton.setText(os.path.basename(self.image_label_dict.keys()[0]))
         
-        image_fns = sorted(glob(os.path.join(self.dataFolder, '*')))
-        label_fns = sorted(glob(os.path.join(self.labelFolder, '*')))
-        label_dict = {os.path.splitext(os.path.basename(fn))[0]: fn for fn in label_fns}
-        self.image_label_dict = OrderedDict()
-        for image_fn in image_fns:
-            case_name = os.path.splitext(os.path.basename(image_fn))[0]
-            if case_name in label_dict:
-                label_fn = label_dict[case_name]
-                self.image_label_dict[case_name] = image_fn, label_fn
-
-        self.imageComboBox.clear()
-        self.active_label_fn = None
+        # case combobox
+        self.caseComboBox.clear()
         if self.image_label_dict:
             case_names = list(self.image_label_dict.keys())
-            self.imageComboBox.addItems(case_names)  # load names into combobox
-            self.imageComboBox.enabled = True
+            self.caseComboBox.addItems(case_names)  # load names into combobox
+            self.caseComboBox.enabled = True
             self.nextImageButton.enabled = True
             self.previousImageButton.enabled = True
             self.selected_image_ind = 0
-            self.active_label_fn = self.image_label_dict[case_names[0]][1]
         else:
-            self.imageComboBox.enabled = False
+            self.selectDataButton.setText('Select Data Folders')
+            self.caseComboBox.enabled = False
             self.nextImageButton.enabled = False
             self.previousImageButton.enabled = False
             self.selected_image_ind = None
             self.active_label_fn = None
 
-    
+
     def nextImage(self):
         self.selected_image_ind += 1
         if self.selected_image_ind > len(self.image_label_dict) - 1:
             self.selected_image_ind -= len(self.image_label_dict)
-        self.imageComboBox.setCurrentIndex(self.selected_image_ind)
+        self.caseComboBox.setCurrentIndex(self.selected_image_ind)
 
 
     def previousImage(self):
         self.selected_image_ind -= 1
         if self.selected_image_ind < 0:
             self.selected_image_ind += len(self.image_label_dict)
-        self.imageComboBox.setCurrentIndex(self.selected_image_ind)
+        self.caseComboBox.setCurrentIndex(self.selected_image_ind)
 
 
     def onComboboxChanged(self, text):
@@ -166,54 +198,120 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         except ValueError:
             return
 
-        slicer.mrmlScene.Clear(0)
         try:
-            volFilename, labelFilename = self.image_label_dict[text]
+            im_fns, label_fn = self.image_label_dict[text]
         except KeyError:
             print('Could not find %s among selected images' % text)
             return
-        self.active_label_fn = labelFilename
+        self.active_label_fn = label_fn
 
-
-        # TODO: if there's not labelFilename, create empty seg:
-        # addedSegmentID = segmentationNode.GetSegmentation().AddEmptySegment('seg name')
+        # remove existing nodes (if any)
+        if hasattr(self, 'volNodes'):
+            for volNode in self.volNodes:
+                slicer.mrmlScene.RemoveNode(volNode)
+        if hasattr(self, 'segmentationNode'):
+            slicer.mrmlScene.RemoveNode(self.segmentationNode)
         
+        # TODO: if there's not label_fn, create empty seg
+        
+        # set red/green/yellow views to axial orientation
+        sliceNodes = slicer.util.getNodesByClass('vtkMRMLSliceNode')
+        for sliceNode in sliceNodes:
+            sliceNode.SetOrientationToAxial()
 
-        # create vol/label nodes
-        [success, self.volNode] = slicer.util.loadVolume(volFilename, returnNode=True)
+        # create label node as a labelVolume
+        [success, labelmapNode] = slicer.util.loadLabelVolume(label_fn, returnNode=True)
         if not success:
-            print('Failed to load volume ', volFilename)
-            return
-        [success, labelmapNode] = slicer.util.loadLabelVolume(labelFilename, returnNode=True)
-        if not success:
-            print('Failed to load label volume ', labelFilename)
+            print('Failed to load label volume ', label_fn)
             return
                 
-        # create segmentation node
-        try:
-            slicer.mrmlScene.RemoveNode(self.segmentationNode)
-            del self.segmentationNode
-        except:
-            pass
-        self.segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode', 'Prostate Segmentation')
-        self.segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(self.volNode)
+        # create vol nodes
+        self.volNodes = []
+        for im_fn in im_fns:
+            [success, vol_node] = slicer.util.loadVolume(im_fn, returnNode=True)
+            vol_node.GetScalarVolumeDisplayNode().SetInterpolate(0)
+            if success:
+                self.volNodes.append(vol_node)
+            else:
+                print('WARNING: Failed to load volume ', im_fn)
+        if len(self.volNodes) == 0:
+            print('Failed to load any volumes from folder '+text+'!')
+            return
+
+        # create segmentation node from labelVolume
+        self.segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode', 'Tumor Segmentation')
+        self.segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(self.volNodes[0])
         self.segmentationNode.CreateDefaultDisplayNodes()
         slicer.mrmlScene.AddNode(self.segmentationNode)
         slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmapNode, self.segmentationNode)
+        self.segEditorWidget.setSegmentationNode(self.segmentationNode) 
+        # self.segEditorWidget.setMasterVolumeNode(masterVolumeNode)
         slicer.mrmlScene.RemoveNode(labelmapNode)
-        
+
+        # set segment names
+        # FIXME: this will crash for non-numeric segment names
+        segmentation = self.segmentationNode.GetSegmentation()
+        segments = [segmentation.GetNthSegment(segInd) for segInd in range(segmentation.GetNumberOfSegments())]
+        segmentNameDict = {segment.GetName(): segment for segment in segments}
+        for labelVal, labelName in LABEL_NAMES.items():
+            color = np.array(LABEL_COLORS[labelVal], float) / 255
+            if str(labelVal) in segmentNameDict:
+                try:
+                    segment = segmentNameDict[str(labelVal)]
+                    defaultSegName = segment.GetName()
+                    labelName = LABEL_NAMES[int(defaultSegName)]
+                    segment.SetColor(color)
+                    segment.SetName(labelName)
+                except (KeyError, ValueError):
+                    print('ERROR: problem getting label name for segment named', defaultSegName)
+                    continue
+            else:  # label is missing from labelmap, create empty segment
+                print('Adding empty segment for class', labelName)
+                segmentation.AddEmptySegment('', labelName, color)
+
+        # configure views
+        view_names = ['Red', 'Yellow', 'Green']
+        for vol_node, view_name in zip(self.volNodes, view_names):
+            view = slicer.app.layoutManager().sliceWidget(view_name)
+            view.sliceLogic().GetSliceCompositeNode().SetBackgroundVolumeID(vol_node.GetID())
+            view.sliceLogic().GetSliceCompositeNode().SetLinkedControl(True)
+            view.mrmlSliceNode().RotateToVolumePlane(vol_node)
+            view.sliceController().setSliceVisible(True)  # show in 3d view
+                
 
     def saveActiveSegmentation(self):
         if self.active_label_fn:
+
+            # restore original label values
+            segmentation = self.segmentationNode.GetSegmentation()
+            for segInd in range(segmentation.GetNumberOfSegments()):
+                segment = segmentation.GetNthSegment(segInd)
+                try:
+                    labelVal = LABEL_NAME_TO_LABEL_VAL[segment.GetName()]
+                    segment.SetName(str(labelVal))
+                except KeyError:
+                    continue
+
+            # Save to file
             print('Saving seg to', self.active_label_fn)
             visibleSegmentIds = vtk.vtkStringArray()
             self.segmentationNode.GetDisplayNode().GetVisibleSegmentIDs(visibleSegmentIds)
             labelmapNode = slicer.vtkMRMLLabelMapVolumeNode()
             slicer.mrmlScene.AddNode(labelmapNode)
-            slicer.vtkSlicerSegmentationsModuleLogic.ExportSegmentsToLabelmapNode(self.segmentationNode, visibleSegmentIds, labelmapNode, self.volNode)
+            slicer.vtkSlicerSegmentationsModuleLogic.ExportSegmentsToLabelmapNode(self.segmentationNode, visibleSegmentIds, labelmapNode, self.volNodes[0])
             slicer.util.saveNode(labelmapNode, self.active_label_fn)
+            slicer.mrmlScene.RemoveNode(labelmapNode)
             
 
     def cleanup(self):
-        pass
+        try:
+            self.saveActiveSegmentation()
+        except:
+            pass
+        try:
+            slicer.mrmlScene.RemoveNode(self.segmentationNode)
+            del self.segmentationNode
+        except:
+            pass
+        slicer.mrmlScene.Clear(0)
         

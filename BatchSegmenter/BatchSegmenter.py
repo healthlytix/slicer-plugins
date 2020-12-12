@@ -9,21 +9,21 @@ import logging
 
 
 IMAGE_PATTERNS = [
-    'BraTS20_Training_???_t1ce.nii.gz',
-    'BraTS20_Training_???_t2.nii.gz',
-    'BraTS20_Training_???_flair.nii.gz',
-    'BraTS20_Training_???_t1.nii.gz'
+    '???_t1ce.nii',
+    '???_t2.nii',
+    '???_flair.nii',
+    '???_t1.nii'
 ]
-LABEL_PATTERN = 'BraTS20_Training_???_seg.nii.gz'
+LABEL_PATTERN = '???_seg.nii'
 LABEL_NAMES = {
     1: 'necrotic / non-enhancing core',
     2: 'peritumoral edema',
-    4: 'enhancing tumor'
+    3: 'enhancing tumor'
 }
 LABEL_COLORS = {
     1: (255,0,0),
     2: (0,255,0),
-    4: (0,0,255)
+    3: (0,0,255)
 }
 
 LABEL_NAME_TO_LABEL_VAL = {val: key for key, val in LABEL_NAMES.items()}
@@ -147,7 +147,6 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
 
     def updateWidgets(self):
         """Load selected valid case names into the widget"""
-
         # select data button
         if len(self.image_label_dict) > 1:
             self.selectDataButton.setText(str(len(self.image_label_dict))+' cases')

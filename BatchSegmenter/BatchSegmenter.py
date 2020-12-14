@@ -151,7 +151,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         if len(self.image_label_dict) > 1:
             self.selectDataButton.setText(str(len(self.image_label_dict))+' cases')
         elif len(self.image_label_dict) == 1:
-            self.selectDataButton.setText(os.path.basename(self.image_label_dict.keys()[0]))
+            self.selectDataButton.setText(os.path.basename(list(self.image_label_dict.keys())[0]))
         
         # case combobox
         self.caseComboBox.clear()

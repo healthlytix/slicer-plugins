@@ -254,11 +254,13 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
 
         # set segment names
         segmentation = self.segmentationNode.GetSegmentation()
-        # print('DEBUG: range(segmentation.GetNumberOfSegments()) =', range(segmentation.GetNumberOfSegments()))
-        segments = [segmentation.GetNthSegment(segInd) for segInd in range(segmentation.GetNumberOfSegments())]
 
-        segmentLabelDict = {segNum: segment for segNum, segment in enumerate(segments)}
-        print('DEBUG: segmentLabelDict =', segmentLabelDict)
+        # print('DEBUG: range(segmentation.GetNumberOfSegments()) =', range(segmentation.GetNumberOfSegments()))
+        integerLabels = np.unique(slicer.util.arrayFromVolume(labelmapNode))
+        integerLabels = np.delete(integerLabels, np.argwhere(integerLabels==0))  # remove background label
+        segments = [segmentation.GetNthSegment(segInd) for segInd in range(segmentation.GetNumberOfSegments())]
+        labelToSegment = {label: segment for label, segment in zip(integerLabels, segments)}
+
         """
         The issue seems to be that for binary segmentations, segment.getName() will return the filename
         for segmentations containing multiple labels, segment.getName() will return the integer label (the dev branch handles this correctly)
@@ -266,16 +268,14 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
 
         for labelVal, labelName in LABEL_NAMES.items():
             color = np.array(LABEL_COLORS[labelVal], float) / 255
-            if labelVal in segmentLabelDict:
+            if labelVal in labelToSegment:
                 try:
-                    print('INFO: loading segment for label ', labelVal)
-                    segment = segmentLabelDict[labelVal]
-                    defaultSegName = segment.GetName()
-                    labelName = LABEL_NAMES[int(defaultSegName)]
+                    segment = labelToSegment[labelVal]
+                    labelName = LABEL_NAMES[labelVal]
                     segment.SetColor(color)
                     segment.SetName(labelName)
-                except (KeyError, ValueError):
-                    print('ERROR: problem getting label name for segment named', defaultSegName)
+                except KeyError:
+                    print('ERROR: problem getting label name for segment ', labelVal)
                     continue
             else:  # label is missing from labelmap, create empty segment
                 print('Adding empty segment for class', labelName)
@@ -302,7 +302,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
                     labelVal = LABEL_NAME_TO_LABEL_VAL[segment.GetName()]
                     segment.SetName(str(labelVal))
                 except KeyError:
-                    TODO: create user-visible error here (an alert box or something)
+                    # TODO: create user-visible error here (an alert box or something)
                     print('ERROR: saving segment number '+str(segInd)+' failed because its name ("'+str(segment.GetName())+'") is not one of '+str(LABEL_NAME_TO_LABEL_VAL.keys()))
                     continue
 

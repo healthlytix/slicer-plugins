@@ -9,12 +9,12 @@ import logging
 
 
 IMAGE_PATTERNS = [
-    '???_t1ce.nii',
-    '???_t2.nii',
-    '???_flair.nii',
-    '???_t1.nii'
+    'T1-postcontrast.nii',
+    'T2.nii',
+    'FLAIR.nii',
+    'T1-precontrast.nii'
 ]
-LABEL_PATTERN = '???_seg.nii'
+LABEL_PATTERN = 'tumor-seg-CW.nii'
 LABEL_NAMES = {
     1: 'necrotic / non-enhancing core',
     2: 'peritumoral edema',
@@ -36,7 +36,7 @@ class BatchSegmenter(ScriptedLoadableModule):
         self.parent.title = "Batch Segmentation Editor"
         self.parent.categories = ["Segmentation"]
         self.parent.dependencies = []
-        self.parent.contributors = ["Brian Keating (Healthlytix)"]
+        self.parent.contributors = ["Brian Keating (Cortechs.ai)"]
         self.parent.helpText = """"""
         self.parent.helpText += self.getDefaultModuleDocumentationLink()
         self.parent.acknowledgementText = """"""
@@ -115,6 +115,10 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.active_label_fn = None
         self.dataFolders = None
 
+        # DEBUG
+        self.image_label_dict = OrderedDict([(u'PGBM-001_11-19-1991', ([u'/Users/brian/tmp/williamson-segs/images/PGBM-001_11-19-1991/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/PGBM-001_11-19-1991/T2.nii', u'/Users/brian/tmp/williamson-segs/images/PGBM-001_11-19-1991/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/PGBM-001_11-19-1991/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/PGBM-001_11-19-1991/tumor-seg-CW.nii')), (u'PGBM-005_07-02-1991', ([u'/Users/brian/tmp/williamson-segs/images/PGBM-005_07-02-1991/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/PGBM-005_07-02-1991/T2.nii', u'/Users/brian/tmp/williamson-segs/images/PGBM-005_07-02-1991/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/PGBM-005_07-02-1991/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/PGBM-005_07-02-1991/tumor-seg-CW.nii')), (u'PGBM-010_05-20-1992', ([u'/Users/brian/tmp/williamson-segs/images/PGBM-010_05-20-1992/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/PGBM-010_05-20-1992/T2.nii', u'/Users/brian/tmp/williamson-segs/images/PGBM-010_05-20-1992/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/PGBM-010_05-20-1992/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/PGBM-010_05-20-1992/tumor-seg-CW.nii')), (u'PGBM-010_06-18-1992', ([u'/Users/brian/tmp/williamson-segs/images/PGBM-010_06-18-1992/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/PGBM-010_06-18-1992/T2.nii', u'/Users/brian/tmp/williamson-segs/images/PGBM-010_06-18-1992/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/PGBM-010_06-18-1992/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/PGBM-010_06-18-1992/tumor-seg-CW.nii')), (u'PGBM-011_06-29-1989', ([u'/Users/brian/tmp/williamson-segs/images/PGBM-011_06-29-1989/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/PGBM-011_06-29-1989/T2.nii', u'/Users/brian/tmp/williamson-segs/images/PGBM-011_06-29-1989/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/PGBM-011_06-29-1989/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/PGBM-011_06-29-1989/tumor-seg-CW.nii')), (u'PGBM-011_08-24-1989', ([u'/Users/brian/tmp/williamson-segs/images/PGBM-011_08-24-1989/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/PGBM-011_08-24-1989/T2.nii', u'/Users/brian/tmp/williamson-segs/images/PGBM-011_08-24-1989/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/PGBM-011_08-24-1989/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/PGBM-011_08-24-1989/tumor-seg-CW.nii')), (u'TCGA-02-0003_06-07-1997', ([u'/Users/brian/tmp/williamson-segs/images/TCGA-02-0003_06-07-1997/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-02-0003_06-07-1997/T2.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-02-0003_06-07-1997/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-02-0003_06-07-1997/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/TCGA-02-0003_06-07-1997/tumor-seg-CW.nii')), (u'TCGA-02-0048_01-28-1999', ([u'/Users/brian/tmp/williamson-segs/images/TCGA-02-0048_01-28-1999/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-02-0048_01-28-1999/T2.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-02-0048_01-28-1999/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-02-0048_01-28-1999/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/TCGA-02-0048_01-28-1999/tumor-seg-CW.nii')), (u'TCGA-02-0060_02-27-2000', ([u'/Users/brian/tmp/williamson-segs/images/TCGA-02-0060_02-27-2000/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-02-0060_02-27-2000/T2.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-02-0060_02-27-2000/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-02-0060_02-27-2000/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/TCGA-02-0060_02-27-2000/tumor-seg-CW.nii')), (u'TCGA-12-1602_03-04-2001', ([u'/Users/brian/tmp/williamson-segs/images/TCGA-12-1602_03-04-2001/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-12-1602_03-04-2001/T2.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-12-1602_03-04-2001/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-12-1602_03-04-2001/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/TCGA-12-1602_03-04-2001/tumor-seg-CW.nii')), (u'TCGA-14-0813_10-12-1996', ([u'/Users/brian/tmp/williamson-segs/images/TCGA-14-0813_10-12-1996/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-14-0813_10-12-1996/T2.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-14-0813_10-12-1996/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-14-0813_10-12-1996/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/TCGA-14-0813_10-12-1996/tumor-seg-CW.nii')), (u'TCGA-14-1402_10-08-1999', ([u'/Users/brian/tmp/williamson-segs/images/TCGA-14-1402_10-08-1999/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-14-1402_10-08-1999/T2.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-14-1402_10-08-1999/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-14-1402_10-08-1999/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/TCGA-14-1402_10-08-1999/tumor-seg-CW.nii')), (u'TCGA-14-1829_06-16-2001', ([u'/Users/brian/tmp/williamson-segs/images/TCGA-14-1829_06-16-2001/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-14-1829_06-16-2001/T2.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-14-1829_06-16-2001/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-14-1829_06-16-2001/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/TCGA-14-1829_06-16-2001/tumor-seg-CW.nii')), (u'TCGA-CS-4943_09-02-2000', ([u'/Users/brian/tmp/williamson-segs/images/TCGA-CS-4943_09-02-2000/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-CS-4943_09-02-2000/T2.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-CS-4943_09-02-2000/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-CS-4943_09-02-2000/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/TCGA-CS-4943_09-02-2000/tumor-seg-CW.nii')), (u'TCGA-CS-5395_10-04-1998', ([u'/Users/brian/tmp/williamson-segs/images/TCGA-CS-5395_10-04-1998/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-CS-5395_10-04-1998/T2.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-CS-5395_10-04-1998/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-CS-5395_10-04-1998/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/TCGA-CS-5395_10-04-1998/tumor-seg-CW.nii')), (u'TCGA-CS-6290_09-17-2000', ([u'/Users/brian/tmp/williamson-segs/images/TCGA-CS-6290_09-17-2000/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-CS-6290_09-17-2000/T2.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-CS-6290_09-17-2000/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-CS-6290_09-17-2000/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/TCGA-CS-6290_09-17-2000/tumor-seg-CW.nii')), (u'TCGA-CS-6667_11-05-2001', ([u'/Users/brian/tmp/williamson-segs/images/TCGA-CS-6667_11-05-2001/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-CS-6667_11-05-2001/T2.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-CS-6667_11-05-2001/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-CS-6667_11-05-2001/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/TCGA-CS-6667_11-05-2001/tumor-seg-CW.nii')), (u'TCGA-DU-6407_12-22-1992', ([u'/Users/brian/tmp/williamson-segs/images/TCGA-DU-6407_12-22-1992/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-DU-6407_12-22-1992/T2.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-DU-6407_12-22-1992/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-DU-6407_12-22-1992/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/TCGA-DU-6407_12-22-1992/tumor-seg-CW.nii')), (u'TCGA-DU-6410_12-28-1995', ([u'/Users/brian/tmp/williamson-segs/images/TCGA-DU-6410_12-28-1995/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-DU-6410_12-28-1995/T2.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-DU-6410_12-28-1995/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-DU-6410_12-28-1995/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/TCGA-DU-6410_12-28-1995/tumor-seg-CW.nii')), (u'TCGA-EZ-7264A_08-16-2001', ([u'/Users/brian/tmp/williamson-segs/images/TCGA-EZ-7264A_08-16-2001/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-EZ-7264A_08-16-2001/T2.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-EZ-7264A_08-16-2001/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-EZ-7264A_08-16-2001/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/TCGA-EZ-7264A_08-16-2001/tumor-seg-CW.nii')), (u'TCGA-HT-7692_07-24-1996', ([u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-7692_07-24-1996/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-7692_07-24-1996/T2.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-7692_07-24-1996/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-7692_07-24-1996/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-7692_07-24-1996/tumor-seg-CW.nii')), (u'TCGA-HT-7855_10-20-1995', ([u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-7855_10-20-1995/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-7855_10-20-1995/T2.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-7855_10-20-1995/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-7855_10-20-1995/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-7855_10-20-1995/tumor-seg-CW.nii')), (u'TCGA-HT-7860_05-13-1996', ([u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-7860_05-13-1996/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-7860_05-13-1996/T2.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-7860_05-13-1996/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-7860_05-13-1996/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-7860_05-13-1996/tumor-seg-CW.nii')), (u'TCGA-HT-8106_07-28-1997', ([u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-8106_07-28-1997/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-8106_07-28-1997/T2.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-8106_07-28-1997/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-8106_07-28-1997/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-8106_07-28-1997/tumor-seg-CW.nii')), (u'TCGA-HT-A614_12-24-1999', ([u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-A614_12-24-1999/T1-postcontrast.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-A614_12-24-1999/T2.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-A614_12-24-1999/FLAIR.nii', u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-A614_12-24-1999/T1-precontrast.nii'], u'/Users/brian/tmp/williamson-segs/images/TCGA-HT-A614_12-24-1999/tumor-seg-CW.nii'))])
+        self.updateWidgets()
+
 
     def onSelectDataButtonPressed(self):
         file_dialog = qt.QFileDialog(None, 'Select Data Folders')
@@ -142,6 +146,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
                     self.image_label_dict[folder_name] = im_fns, label_fn
                 else:
                     print('WARNING: Skipping '+data_folder+' because it is missing (or contains multiple) required input images')
+            print(self.image_label_dict)
             self.updateWidgets()
 
 
@@ -248,15 +253,19 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         slicer.mrmlScene.RemoveNode(labelmapNode)
 
         # set segment names
-        # FIXME: this will crash for non-numeric segment names
         segmentation = self.segmentationNode.GetSegmentation()
+        # print('DEBUG: range(segmentation.GetNumberOfSegments()) =', range(segmentation.GetNumberOfSegments()))
         segments = [segmentation.GetNthSegment(segInd) for segInd in range(segmentation.GetNumberOfSegments())]
-        segmentNameDict = {segment.GetName(): segment for segment in segments}
+
+        segmentLabelDict = {segNum: segment for segNum, segment in enumerate(segments)}
+        print('DEBUG: segmentLabelDict =', segmentLabelDict)
+
         for labelVal, labelName in LABEL_NAMES.items():
             color = np.array(LABEL_COLORS[labelVal], float) / 255
-            if str(labelVal) in segmentNameDict:
+            if labelVal in segmentLabelDict:
                 try:
-                    segment = segmentNameDict[str(labelVal)]
+                    print('INFO: loading segment for label ', labelVal)
+                    segment = segmentLabelDict[labelVal]
                     defaultSegName = segment.GetName()
                     labelName = LABEL_NAMES[int(defaultSegName)]
                     segment.SetColor(color)
@@ -289,6 +298,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
                     labelVal = LABEL_NAME_TO_LABEL_VAL[segment.GetName()]
                     segment.SetName(str(labelVal))
                 except KeyError:
+                    print('ERROR: saving segment number '+str(segInd)+' failed because its name ("'+str(segment.GetName())+'") is not one of '+str(LABEL_NAME_TO_LABEL_VAL.keys()))
                     continue
 
             # Save to file

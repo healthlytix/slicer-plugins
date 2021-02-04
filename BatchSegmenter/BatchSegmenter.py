@@ -259,6 +259,10 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
 
         segmentLabelDict = {segNum: segment for segNum, segment in enumerate(segments)}
         print('DEBUG: segmentLabelDict =', segmentLabelDict)
+        """
+        The issue seems to be that for binary segmentations, segment.getName() will return the filename
+        for segmentations containing multiple labels, segment.getName() will return the integer label (the dev branch handles this correctly)
+        """
 
         for labelVal, labelName in LABEL_NAMES.items():
             color = np.array(LABEL_COLORS[labelVal], float) / 255
@@ -298,6 +302,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
                     labelVal = LABEL_NAME_TO_LABEL_VAL[segment.GetName()]
                     segment.SetName(str(labelVal))
                 except KeyError:
+                    TODO: create user-visible error here (an alert box or something)
                     print('ERROR: saving segment number '+str(segInd)+' failed because its name ("'+str(segment.GetName())+'") is not one of '+str(LABEL_NAME_TO_LABEL_VAL.keys()))
                     continue
 

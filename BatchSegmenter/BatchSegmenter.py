@@ -14,7 +14,7 @@ IMAGE_PATTERNS = [
     'FLAIR.nii',
     'T1-precontrast.nii'
 ]
-LABEL_PATTERN = 'tumor-seg-CW.nii'
+LABEL_PATTERN = 'tumor-seg.nii'
 LABEL_NAMES = {
     1: 'necrotic / non-enhancing core',
     2: 'peritumoral edema',

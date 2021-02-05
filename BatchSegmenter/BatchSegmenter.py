@@ -9,12 +9,12 @@ import logging
 
 
 IMAGE_PATTERNS = [
-    '???_t1ce.nii',
-    '???_t2.nii',
-    '???_flair.nii',
-    '???_t1.nii'
+    'T1-postcontrast.nii',
+    'T2.nii',
+    'FLAIR.nii',
+    'T1-precontrast.nii'
 ]
-LABEL_PATTERN = '???_seg.nii'
+LABEL_PATTERN = 'tumor-seg-CW.nii'
 LABEL_NAMES = {
     1: 'necrotic / non-enhancing core',
     2: 'peritumoral edema',
@@ -36,7 +36,7 @@ class BatchSegmenter(ScriptedLoadableModule):
         self.parent.title = "Batch Segmentation Editor"
         self.parent.categories = ["Segmentation"]
         self.parent.dependencies = []
-        self.parent.contributors = ["Brian Keating (Healthlytix)"]
+        self.parent.contributors = ["Brian Keating (Cortechs.ai)"]
         self.parent.helpText = """"""
         self.parent.helpText += self.getDefaultModuleDocumentationLink()
         self.parent.acknowledgementText = """"""
@@ -142,6 +142,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
                     self.image_label_dict[folder_name] = im_fns, label_fn
                 else:
                     print('WARNING: Skipping '+data_folder+' because it is missing (or contains multiple) required input images')
+            print(self.image_label_dict)
             self.updateWidgets()
 
 
@@ -244,25 +245,25 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         slicer.mrmlScene.AddNode(self.segmentationNode)
         slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmapNode, self.segmentationNode)
         self.segEditorWidget.setSegmentationNode(self.segmentationNode) 
-        # self.segEditorWidget.setMasterVolumeNode(masterVolumeNode)
         slicer.mrmlScene.RemoveNode(labelmapNode)
 
-        # set segment names
-        # FIXME: this will crash for non-numeric segment names
+        # figure out segment labels
         segmentation = self.segmentationNode.GetSegmentation()
+        integerLabels = np.unique(slicer.util.arrayFromVolume(labelmapNode))
+        integerLabels = np.delete(integerLabels, np.argwhere(integerLabels==0))  # remove background label
         segments = [segmentation.GetNthSegment(segInd) for segInd in range(segmentation.GetNumberOfSegments())]
-        segmentNameDict = {segment.GetName(): segment for segment in segments}
+        labelToSegment = {label: segment for label, segment in zip(integerLabels, segments)}
+
         for labelVal, labelName in LABEL_NAMES.items():
             color = np.array(LABEL_COLORS[labelVal], float) / 255
-            if str(labelVal) in segmentNameDict:
+            if labelVal in labelToSegment:
                 try:
-                    segment = segmentNameDict[str(labelVal)]
-                    defaultSegName = segment.GetName()
-                    labelName = LABEL_NAMES[int(defaultSegName)]
+                    segment = labelToSegment[labelVal]
+                    labelName = LABEL_NAMES[labelVal]
                     segment.SetColor(color)
                     segment.SetName(labelName)
-                except (KeyError, ValueError):
-                    print('ERROR: problem getting label name for segment named', defaultSegName)
+                except KeyError:
+                    print('ERROR: problem getting label name for segment ', labelVal)
                     continue
             else:  # label is missing from labelmap, create empty segment
                 print('Adding empty segment for class', labelName)
@@ -289,7 +290,9 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
                     labelVal = LABEL_NAME_TO_LABEL_VAL[segment.GetName()]
                     segment.SetName(str(labelVal))
                 except KeyError:
-                    continue
+                    # TODO: create user-visible error here (an alert box or something)
+                    print('ERROR: saving segment number '+str(segInd)+' failed because its name ("'+str(segment.GetName())+'") is not one of '+str(LABEL_NAME_TO_LABEL_VAL.keys()))
+                    return
 
             # Save to file
             print('Saving seg to', self.active_label_fn)

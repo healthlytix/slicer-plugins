@@ -142,7 +142,6 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
                     self.image_label_dict[folder_name] = im_fns, label_fn
                 else:
                     print('WARNING: Skipping '+data_folder+' because it is missing (or contains multiple) required input images')
-            print(self.image_label_dict)
             self.updateWidgets()
 
 
@@ -260,13 +259,14 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
                 try:
                     segment = labelToSegment[labelVal]
                     labelName = LABEL_NAMES[labelVal]
+                    print('INFO: Adding segment for label ', labelVal, ' as ', labelName)
                     segment.SetColor(color)
                     segment.SetName(labelName)
                 except KeyError:
                     print('ERROR: problem getting label name for segment ', labelVal)
                     continue
             else:  # label is missing from labelmap, create empty segment
-                print('Adding empty segment for class', labelName)
+                print('INFO: Adding empty segment for class', labelName)
                 segmentation.AddEmptySegment('', labelName, color)
 
         # configure views
@@ -288,6 +288,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
                 segment = segmentation.GetNthSegment(segInd)
                 try:
                     labelVal = LABEL_NAME_TO_LABEL_VAL[segment.GetName()]
+                    print('INFO: saving '+segment.GetName()+' segment as '+str(labelVal))
                     segment.SetName(str(labelVal))
                 except KeyError:
                     # TODO: create user-visible error here (an alert box or something)
@@ -303,6 +304,9 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             slicer.vtkSlicerSegmentationsModuleLogic.ExportSegmentsToLabelmapNode(self.segmentationNode, visibleSegmentIds, labelmapNode, self.volNodes[0])
             slicer.util.saveNode(labelmapNode, self.active_label_fn)
             slicer.mrmlScene.RemoveNode(labelmapNode)
+            slicer.mrmlScene.RemoveNode(self.segmentationNode.GetDisplayNode())
+            slicer.mrmlScene.RemoveNode(self.segmentationNode)
+            self.segmentationNode = None
             
 
     def cleanup(self):

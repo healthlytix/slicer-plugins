@@ -250,7 +250,6 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             slicer.mrmlScene.RemoveNode(volNode)
         if self.segmentationNode:
             slicer.mrmlScene.RemoveNode(self.segmentationNode)  # FIXME: this doesn't seem to work
-        slicer.mrmlScene.Clear(0)
         self.segmentationNode = None
         self.volNodes = []
 
@@ -337,3 +336,117 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         if self.segmentationNode:
             self.saveActiveSegmentation()
         self.clearBatchSegmenterNodes()
+
+
+
+class BatchSegmenterTest():
+
+    def delayDisplay(self, message, msec=1500):
+        """Display a small dialog and wait
+    
+        This does two things: 1) it lets the event loop catch up
+        to the state of the test so that rendering and widget updates
+        have all taken place before the test continues and 2) it
+        shows the user/developer/tester the state of the test
+        so that we'll know when it breaks
+        """
+        print(message)
+        self.info = qt.QDialog()
+        self.infoLayout = qt.QVBoxLayout()
+        self.info.setLayout(self.infoLayout)
+        self.label = qt.QLabel(message,self.info)
+        self.infoLayout.addWidget(self.label)
+        qt.QTimer.singleShot(msec, self.info.close)
+        self.info.exec_()
+
+
+    def setUp(self):
+        """ Do whatever is needed to reset the state - typically a scene clear will be enough."""
+        slicer.mrmlScene.Clear(0)
+
+
+    def runTest(self):
+        """Run as few or as many tests as needed here."""
+        self.setUp()
+        self.testSegmentationWizard()
+
+
+    def testSegmentationWizard(self):
+        self.delayDisplay('Starting the test')
+
+    #     self.delayDisplay("Loading sample data")
+    #     import SampleData
+    #     sampleDataLogic = SampleData.SampleDataLogic()
+    #     head = sampleDataLogic.downloadMRHead()
+    #     braintumor1 = sampleDataLogic.downloadMRBrainTumor1()
+    #     braintumor2 = sampleDataLogic.downloadMRBrainTumor2()
+
+        self.delayDisplay('Creating BatchSegmenter widgets')
+        mainWindow = slicer.util.mainWindow()
+        # layoutManager = slicer.app.layoutManager()
+        mainWindow.moduleSelector().selectModule('SegmentationWizard')
+
+    #     modelsegmentation_module = slicer.modules.modelsegmentation.widgetRepresentation().self()
+
+    #     self.delayDisplay('Select Volumes')
+    #     baselineNode = braintumor1
+    #     followupNode = braintumor2
+    #     modelsegmentation_module.Step1._VolumeSelectStep__enableSubtractionMapping.setChecked(True)
+    #     modelsegmentation_module.Step1._VolumeSelectStep__baselineVolumeSelector.setCurrentNode(baselineNode)
+    #     modelsegmentation_module.Step1._VolumeSelectStep__followupVolumeSelector.setCurrentNode(followupNode)
+
+    #     self.delayDisplay('Go Forward')
+    #     modelsegmentation_module.workflow.goForward()
+
+    #     self.delayDisplay('Register Images')
+    #     modelsegmentation_module.Step2.onRegistrationRequest(wait_for_completion=True)
+
+    #     self.delayDisplay('Go Forward')
+    #     modelsegmentation_module.workflow.goForward()
+
+    #     self.delayDisplay('Normalize Images')
+    #     modelsegmentation_module.Step3.onGaussianNormalizationRequest()
+
+    #     self.delayDisplay('Subtract Images')
+    #     modelsegmentation_module.Step3.onSubtractionRequest(wait_for_completion=True)
+
+    #     self.delayDisplay('Go Forward')
+    #     modelsegmentation_module.workflow.goForward()
+
+    #     self.delayDisplay('Load model')
+
+    #     displayNode = slicer.vtkMRMLMarkupsDisplayNode()
+    #     slicer.mrmlScene.AddNode(displayNode)
+    #     inputMarkup = slicer.vtkMRMLMarkupsFiducialNode()
+    #     inputMarkup.SetName('Test')
+    #     slicer.mrmlScene.AddNode(inputMarkup)
+    #     inputMarkup.SetAndObserveDisplayNodeID(displayNode.GetID())
+
+    #     modelsegmentation_module.Step4._ROIStep__clippingMarkupSelector.setCurrentNode(inputMarkup)
+
+    #     inputMarkup.AddFiducial(35,-10,-10)
+    #     inputMarkup.AddFiducial(-15,20,-10)
+    #     inputMarkup.AddFiducial(-25,-25,-10)
+    #     inputMarkup.AddFiducial(-5,-60,-15)
+    #     inputMarkup.AddFiducial(-5,5,60)
+    #     inputMarkup.AddFiducial(-5,-35,-30)
+
+    #     self.delayDisplay('Go Forward')
+    #     modelsegmentation_module.workflow.goForward()
+
+    #     self.delayDisplay('Set Thresholds')
+    #     modelsegmentation_module.Step5._ThresholdStep__threshRange.minimumValue = 50
+    #     modelsegmentation_module.Step5._ThresholdStep__threshRange.maximumValue = 150
+
+    #     self.delayDisplay('Go Forward')
+    #     modelsegmentation_module.workflow.goForward()
+
+    #     self.delayDisplay('Restart Module')
+    #     modelsegmentation_module.Step6.Restart()
+
+        self.delayDisplay('Test passed!')
+        
+    # except Exception, e:
+    #     import traceback
+    #     traceback.print_exc()
+    #     self.delayDisplay('Test caused exception!\n' + str(e))

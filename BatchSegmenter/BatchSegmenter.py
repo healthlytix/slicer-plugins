@@ -173,6 +173,19 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
 
 
     def onComboboxChanged(self, text):
+        """Load a new case when the user selects from the cases combobox
+
+        This is the main function for loading images from disk, configuring the views, and creating
+        a segmentation with the correct display names/colors.
+
+        Arg:
+            text (str): the name of the case (which was derived from the directory name). Should be 
+                a key in ``self.image_label_dict``
+
+        Raises:
+            ValueError: if the config is missing name/color for one of the integer labels in the 
+                label file
+        """
         
         if not self.image_label_dict:
             return
@@ -184,6 +197,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         except ValueError:
             return
 
+        # select the filenames for this case
         try:
             im_fns, label_fn = self.image_label_dict[text]
         except KeyError:
@@ -196,7 +210,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             for volNode in self.volNodes:
                 slicer.mrmlScene.RemoveNode(volNode)
         if hasattr(self, 'segmentationNode'):
-            slicer.mrmlScene.RemoveNode(self.segmentationNode)
+            slicer.mrmlScene.RemoveNode(self.segmentationNode)  # FIXME: this doesn't seem to work
         
         # TODO: if there's not label_fn, create empty seg
         
@@ -204,12 +218,6 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         sliceNodes = slicer.util.getNodesByClass('vtkMRMLSliceNode')
         for sliceNode in sliceNodes:
             sliceNode.SetOrientationToAxial()
-
-        # create label node as a labelVolume
-        [success, labelmapNode] = slicer.util.loadLabelVolume(label_fn, returnNode=True)
-        if not success:
-            print('Failed to load label volume ', label_fn)
-            return
                 
         # create vol nodes
         self.volNodes = []
@@ -222,6 +230,27 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
                 print('WARNING: Failed to load volume ', im_fn)
         if len(self.volNodes) == 0:
             print('Failed to load any volumes from folder '+text+'!')
+            return
+
+        # create segmentation
+        self.createSegmentationFromFile(label_fn)
+
+        # configure views
+        view_names = ['Red', 'Yellow', 'Green']
+        for vol_node, view_name in zip(self.volNodes, view_names):
+            view = slicer.app.layoutManager().sliceWidget(view_name)
+            view.sliceLogic().GetSliceCompositeNode().SetBackgroundVolumeID(vol_node.GetID())
+            view.sliceLogic().GetSliceCompositeNode().SetLinkedControl(True)
+            view.mrmlSliceNode().RotateToVolumePlane(vol_node)
+            view.sliceController().setSliceVisible(True)  # show in 3d view
+                
+
+    def createSegmentationFromFile(self, label_fn):
+
+        # create label node as a labelVolume
+        [success, labelmapNode] = slicer.util.loadLabelVolume(label_fn, returnNode=True)
+        if not success:
+            print('Failed to load label volume ', label_fn)
             return
 
         # create segmentation node from labelVolume
@@ -247,7 +276,6 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
 
         for labelVal, labelName in self.config['labelNames'].items():
             color = np.array(self.config['labelColors'][labelVal], float) / 255
-            print('DEBUG: labelVal', labelVal)
             if labelVal in labelToSegment:
                 try:
                     segment = labelToSegment[labelVal]
@@ -262,15 +290,6 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
                 print('INFO: Adding empty segment for class', labelName)
                 segmentation.AddEmptySegment('', labelName, color)
 
-        # configure views
-        view_names = ['Red', 'Yellow', 'Green']
-        for vol_node, view_name in zip(self.volNodes, view_names):
-            view = slicer.app.layoutManager().sliceWidget(view_name)
-            view.sliceLogic().GetSliceCompositeNode().SetBackgroundVolumeID(vol_node.GetID())
-            view.sliceLogic().GetSliceCompositeNode().SetLinkedControl(True)
-            view.mrmlSliceNode().RotateToVolumePlane(vol_node)
-            view.sliceController().setSliceVisible(True)  # show in 3d view
-                
 
     def saveActiveSegmentation(self):
         if self.active_label_fn:
@@ -297,9 +316,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             slicer.vtkSlicerSegmentationsModuleLogic.ExportSegmentsToLabelmapNode(self.segmentationNode, visibleSegmentIds, labelmapNode, self.volNodes[0])
             slicer.util.saveNode(labelmapNode, self.active_label_fn)
             slicer.mrmlScene.RemoveNode(labelmapNode)
-            slicer.mrmlScene.RemoveNode(self.segmentationNode.GetDisplayNode())
             slicer.mrmlScene.RemoveNode(self.segmentationNode)
-            self.segmentationNode = None
             
 
     def cleanup(self):

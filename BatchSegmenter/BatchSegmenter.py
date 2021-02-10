@@ -98,6 +98,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
 
         ### Logic ###
         self.image_label_dict = OrderedDict()
+        self.segmentationNode = None
         self.selected_image_ind = None
         self.active_label_fn = None
         self.dataFolders = None
@@ -191,7 +192,10 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             return
 
         # save old seg before loading the new one
-        self.saveActiveSegmentation()
+        if self.segmentationNode:
+            print('DEBUG: self.segmentationNode =', self.segmentationNode)
+            self.saveActiveSegmentation()
+
         try:
             self.selected_image_ind = list(self.image_label_dict.keys()).index(text)
         except ValueError:
@@ -209,8 +213,9 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         if hasattr(self, 'volNodes'):
             for volNode in self.volNodes:
                 slicer.mrmlScene.RemoveNode(volNode)
-        if hasattr(self, 'segmentationNode'):
+        if self.segmentationNode:
             slicer.mrmlScene.RemoveNode(self.segmentationNode)  # FIXME: this doesn't seem to work
+        slicer.mrmlScene.Clear(0)
         
         # TODO: if there's not label_fn, create empty seg
         
@@ -308,16 +313,16 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
                     return
 
             # Save to file
-            print('Saving seg to', self.active_label_fn)
-            visibleSegmentIds = vtk.vtkStringArray()
-            self.segmentationNode.GetDisplayNode().GetVisibleSegmentIDs(visibleSegmentIds)
-            labelmapNode = slicer.vtkMRMLLabelMapVolumeNode()
-            slicer.mrmlScene.AddNode(labelmapNode)
-            slicer.vtkSlicerSegmentationsModuleLogic.ExportSegmentsToLabelmapNode(self.segmentationNode, visibleSegmentIds, labelmapNode, self.volNodes[0])
-            slicer.util.saveNode(labelmapNode, self.active_label_fn)
-            slicer.mrmlScene.RemoveNode(labelmapNode)
-            slicer.mrmlScene.RemoveNode(self.segmentationNode)
-            
+            if self.segmentationNode and self.segmentationNode.GetDisplayNode():
+                print('Saving seg to', self.active_label_fn)
+                visibleSegmentIds = vtk.vtkStringArray()
+                self.segmentationNode.GetDisplayNode().GetVisibleSegmentIDs(visibleSegmentIds)
+                labelmapNode = slicer.vtkMRMLLabelMapVolumeNode()
+                slicer.mrmlScene.AddNode(labelmapNode)
+                slicer.vtkSlicerSegmentationsModuleLogic.ExportSegmentsToLabelmapNode(self.segmentationNode, visibleSegmentIds, labelmapNode, self.volNodes[0])
+                slicer.util.saveNode(labelmapNode, self.active_label_fn)
+                slicer.mrmlScene.RemoveNode(labelmapNode)
+                        
 
     def cleanup(self):
         try:
@@ -326,8 +331,8 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             pass
         try:
             slicer.mrmlScene.RemoveNode(self.segmentationNode)
-            del self.segmentationNode
         except:
             pass
+        self.segmentationNode = None
         slicer.mrmlScene.Clear(0)
         

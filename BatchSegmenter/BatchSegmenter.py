@@ -1,4 +1,5 @@
 import os
+import json
 from glob import glob
 import unittest
 from collections import OrderedDict
@@ -7,26 +8,6 @@ import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import logging
 
-
-IMAGE_PATTERNS = [
-    'T1-postcontrast.nii',
-    'T2.nii',
-    'FLAIR.nii',
-    'T1-precontrast.nii'
-]
-LABEL_PATTERN = 'tumor-seg.nii'
-LABEL_NAMES = {
-    1: 'necrotic / non-enhancing core',
-    2: 'peritumoral edema',
-    3: 'enhancing tumor'
-}
-LABEL_COLORS = {
-    1: (255,0,0),
-    2: (0,255,0),
-    3: (0,0,255)
-}
-
-LABEL_NAME_TO_LABEL_VAL = {val: key for key, val in LABEL_NAMES.items()}
 
 
 class BatchSegmenter(ScriptedLoadableModule):
@@ -47,6 +28,12 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
     def setup(self):
         ScriptedLoadableModuleWidget.setup(self)
         
+        # Read config
+        config_fn = os.path.join(os.path.dirname(__file__), 'batch-segmenter-config.json')
+        print('Loading config from ', config_fn)
+        with open(config_fn) as f:
+            self.config = json.load(f)
+        self.labelNameToLabelVal = {val: key for key, val in self.config['labelNames'].items()}
 
         #### Data Area ####
 
@@ -132,13 +119,13 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             data_folders = file_dialog.selectedFiles()
             self.image_label_dict = OrderedDict()
             for data_folder in data_folders:
-                folder_ims = [glob(os.path.join(data_folder, im_fn)) for im_fn in IMAGE_PATTERNS]
+                folder_ims = [glob(os.path.join(data_folder, im_fn)) for im_fn in self.config['imageFilenamePatterns']]
                 has_required_ims = all(len(ims)==1 for ims in folder_ims)
-                has_label = len(glob(os.path.join(data_folder, LABEL_PATTERN))) == 1
+                has_label = len(glob(os.path.join(data_folder, self.config['labelFilenamePattern']))) == 1
                 if has_required_ims and has_label:
                     folder_name = os.path.basename(data_folder)
                     im_fns = [ims[0] for ims in folder_ims]
-                    label_fn = glob(os.path.join(data_folder, LABEL_PATTERN))[0]
+                    label_fn = glob(os.path.join(data_folder, self.config['labelFilenamePattern']))[0]
                     self.image_label_dict[folder_name] = im_fns, label_fn
                 else:
                     print('WARNING: Skipping '+data_folder+' because it is missing (or contains multiple) required input images')
@@ -251,19 +238,25 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         integerLabels = np.unique(slicer.util.arrayFromVolume(labelmapNode))
         integerLabels = np.delete(integerLabels, np.argwhere(integerLabels==0))  # remove background label
         segments = [segmentation.GetNthSegment(segInd) for segInd in range(segmentation.GetNumberOfSegments())]
-        labelToSegment = {label: segment for label, segment in zip(integerLabels, segments)}
+        labelToSegment = {str(label): segment for label, segment in zip(integerLabels, segments)}
+        
+        # verify that labels in label_fn match those in the config
+        existingLabelsHaveAreInConfig = [label in self.config['labelNames'] for label in labelToSegment]
+        if not all(existingLabelsHaveAreInConfig):
+            raise ValueError('Some of the integer labels in '+label_fn+' ('+str(labelToSegment.keys())+') '+' are missing from config ('+str(self.config['labelNames'].keys())+')')
 
-        for labelVal, labelName in LABEL_NAMES.items():
-            color = np.array(LABEL_COLORS[labelVal], float) / 255
+        for labelVal, labelName in self.config['labelNames'].items():
+            color = np.array(self.config['labelColors'][labelVal], float) / 255
+            print('DEBUG: labelVal', labelVal)
             if labelVal in labelToSegment:
                 try:
                     segment = labelToSegment[labelVal]
-                    labelName = LABEL_NAMES[labelVal]
+                    labelName = self.config['labelNames'][labelVal]
                     print('INFO: Adding segment for label ', labelVal, ' as ', labelName)
                     segment.SetColor(color)
                     segment.SetName(labelName)
                 except KeyError:
-                    print('ERROR: problem getting label name for segment ', labelVal)
+                    print('ERROR: problem getting label name or color for segment ', labelVal)
                     continue
             else:  # label is missing from labelmap, create empty segment
                 print('INFO: Adding empty segment for class', labelName)
@@ -287,12 +280,12 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             for segInd in range(segmentation.GetNumberOfSegments()):
                 segment = segmentation.GetNthSegment(segInd)
                 try:
-                    labelVal = LABEL_NAME_TO_LABEL_VAL[segment.GetName()]
+                    labelVal = self.labelNameToLabelVal[segment.GetName()]
                     print('INFO: saving '+segment.GetName()+' segment as '+str(labelVal))
                     segment.SetName(str(labelVal))
                 except KeyError:
                     # TODO: create user-visible error here (an alert box or something)
-                    print('ERROR: saving segment number '+str(segInd)+' failed because its name ("'+str(segment.GetName())+'") is not one of '+str(LABEL_NAME_TO_LABEL_VAL.keys()))
+                    print('ERROR: saving segment number '+str(segInd)+' failed because its name ("'+str(segment.GetName())+'") is not one of '+str(self.labelNameToLabelVal.keys()))
                     return
 
             # Save to file

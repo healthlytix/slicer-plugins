@@ -99,6 +99,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         ### Logic ###
         self.image_label_dict = OrderedDict()
         self.segmentationNode = None
+        self.volNodes = []
         self.selected_image_ind = None
         self.active_label_fn = None
         self.dataFolders = None
@@ -193,7 +194,6 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
 
         # save old seg before loading the new one
         if self.segmentationNode:
-            print('DEBUG: self.segmentationNode =', self.segmentationNode)
             self.saveActiveSegmentation()
 
         try:
@@ -210,27 +210,22 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.active_label_fn = label_fn
 
         # remove existing nodes (if any)
-        if hasattr(self, 'volNodes'):
-            for volNode in self.volNodes:
-                slicer.mrmlScene.RemoveNode(volNode)
-        if self.segmentationNode:
-            slicer.mrmlScene.RemoveNode(self.segmentationNode)  # FIXME: this doesn't seem to work
-        slicer.mrmlScene.Clear(0)
+        self.clearBatchSegmenterNodes()
         
         # TODO: if there's not label_fn, create empty seg
-        
-        # set red/green/yellow views to axial orientation
+
+        # make all slice views axial before loading volumes
         sliceNodes = slicer.util.getNodesByClass('vtkMRMLSliceNode')
         for sliceNode in sliceNodes:
             sliceNode.SetOrientationToAxial()
-                
+        
         # create vol nodes
         self.volNodes = []
         for im_fn in im_fns:
-            [success, vol_node] = slicer.util.loadVolume(im_fn, returnNode=True)
-            vol_node.GetScalarVolumeDisplayNode().SetInterpolate(0)
-            if success:
-                self.volNodes.append(vol_node)
+            volNode = slicer.util.loadVolume(im_fn)
+            if volNode:
+                volNode.GetScalarVolumeDisplayNode().SetInterpolate(0)
+                self.volNodes.append(volNode)
             else:
                 print('WARNING: Failed to load volume ', im_fn)
         if len(self.volNodes) == 0:
@@ -241,20 +236,31 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.createSegmentationFromFile(label_fn)
 
         # configure views
-        view_names = ['Red', 'Yellow', 'Green']
-        for vol_node, view_name in zip(self.volNodes, view_names):
+        for volNode, view_name in zip(self.volNodes, ['Red', 'Yellow', 'Green']):
             view = slicer.app.layoutManager().sliceWidget(view_name)
-            view.sliceLogic().GetSliceCompositeNode().SetBackgroundVolumeID(vol_node.GetID())
+            view.sliceLogic().GetSliceCompositeNode().SetBackgroundVolumeID(volNode.GetID())
             view.sliceLogic().GetSliceCompositeNode().SetLinkedControl(True)
-            view.mrmlSliceNode().RotateToVolumePlane(vol_node)
+            view.mrmlSliceNode().RotateToVolumePlane(volNode)
             view.sliceController().setSliceVisible(True)  # show in 3d view
                 
 
+    def clearBatchSegmenterNodes(self):
+        print('INFO: BatchSegmenter.clearBatchSegmenterNodes invoked')
+        for volNode in self.volNodes:
+            slicer.mrmlScene.RemoveNode(volNode)
+        if self.segmentationNode:
+            slicer.mrmlScene.RemoveNode(self.segmentationNode)  # FIXME: this doesn't seem to work
+        slicer.mrmlScene.Clear(0)
+        self.segmentationNode = None
+        self.volNodes = []
+
+
     def createSegmentationFromFile(self, label_fn):
+        print('INFO: BatchSegmenter.createSegmentationFromFile invoked')
 
         # create label node as a labelVolume
-        [success, labelmapNode] = slicer.util.loadLabelVolume(label_fn, returnNode=True)
-        if not success:
+        labelmapNode = slicer.util.loadLabelVolume(label_fn)
+        if not labelmapNode:
             print('Failed to load label volume ', label_fn)
             return
 
@@ -297,6 +303,8 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
 
 
     def saveActiveSegmentation(self):
+        print('INFO: BatchSegmenter.saveActiveSegmentation() invoked')
+
         if self.active_label_fn:
 
             # restore original label values
@@ -325,14 +333,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
                         
 
     def cleanup(self):
-        try:
+        print('INFO: BatchSegmenter.cleanup() invoked')
+        if self.segmentationNode:
             self.saveActiveSegmentation()
-        except:
-            pass
-        try:
-            slicer.mrmlScene.RemoveNode(self.segmentationNode)
-        except:
-            pass
-        self.segmentationNode = None
-        slicer.mrmlScene.Clear(0)
-        
+        self.clearBatchSegmenterNodes()

@@ -23,6 +23,10 @@ class BatchSegmenter(ScriptedLoadableModule):
         self.parent.acknowledgementText = """"""
 
 
+"""
+Possibly relevant example: https://github.com/Slicer/Slicer/blob/a18612bb2584018822347ff4db16439b5c578e00/Utilities/Templates/Modules/Scripted/TemplateKey.py#L104-L108
+Use VTKObservationMixin and removeObservers()
+"""
 class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
 
     def setup(self):
@@ -220,17 +224,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             sliceNode.SetOrientationToAxial()
         
         # create vol nodes
-        self.volNodes = []
-        for im_fn in im_fns:
-            volNode = slicer.util.loadVolume(im_fn)
-            if volNode:
-                volNode.GetScalarVolumeDisplayNode().SetInterpolate(0)
-                self.volNodes.append(volNode)
-            else:
-                print('WARNING: Failed to load volume ', im_fn)
-        if len(self.volNodes) == 0:
-            print('Failed to load any volumes from folder '+text+'!')
-            return
+        self.loadVolumesFromFiles(im_fns)
 
         # create segmentation
         self.createSegmentationFromFile(label_fn)
@@ -243,6 +237,18 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             view.mrmlSliceNode().RotateToVolumePlane(volNode)
             view.sliceController().setSliceVisible(True)  # show in 3d view
                 
+    def loadVolumesFromFiles(self, filenames):
+        self.volNodes = []
+        for im_fn in filenames:
+            volNode = slicer.util.loadVolume(im_fn)
+            if volNode:
+                volNode.GetScalarVolumeDisplayNode().SetInterpolate(0)
+                self.volNodes.append(volNode)
+            else:
+                print('WARNING: Failed to load volume ', im_fn)
+        if len(self.volNodes) == 0:
+            print('Failed to load any volumes from folder '+text+'!')
+            return
 
     def clearBatchSegmenterNodes(self):
         print('INFO: BatchSegmenter.clearBatchSegmenterNodes invoked')
@@ -341,7 +347,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
 
 class BatchSegmenterTest():
 
-    def delayDisplay(self, message, msec=1500):
+    def delayDisplay(self, message, msec=150):
         """Display a small dialog and wait
     
         This does two things: 1) it lets the event loop catch up
@@ -350,7 +356,7 @@ class BatchSegmenterTest():
         shows the user/developer/tester the state of the test
         so that we'll know when it breaks
         """
-        print(message)
+        print('TEST:', message)
         self.info = qt.QDialog()
         self.infoLayout = qt.QVBoxLayout()
         self.info.setLayout(self.infoLayout)
@@ -372,77 +378,27 @@ class BatchSegmenterTest():
 
 
     def testSegmentationWizard(self):
-        self.delayDisplay('Starting the test')
-
-    #     self.delayDisplay("Loading sample data")
-    #     import SampleData
-    #     sampleDataLogic = SampleData.SampleDataLogic()
-    #     head = sampleDataLogic.downloadMRHead()
-    #     braintumor1 = sampleDataLogic.downloadMRBrainTumor1()
-    #     braintumor2 = sampleDataLogic.downloadMRBrainTumor2()
+        self.delayDisplay('BatchSegmenter tests')
 
         self.delayDisplay('Creating BatchSegmenter widgets')
+        
         mainWindow = slicer.util.mainWindow()
-        # layoutManager = slicer.app.layoutManager()
-        mainWindow.moduleSelector().selectModule('SegmentationWizard')
+        mainWindow.moduleSelector().selectModule('BatchSegmenter')
+        batchSegmentationWidget = slicer.modules.BatchSegmenterWidget
 
-    #     modelsegmentation_module = slicer.modules.modelsegmentation.widgetRepresentation().self()
+        testDataDir = os.path.join(os.path.dirname(__file__), 'Data')
+        sampleLabelFilename = os.path.join(testDataDir, 'tumor-seg.nii')
+        sampleVolFilenames = [
+            os.path.join(testDataDir, 'T1-postcontrast.nii'),
+            os.path.join(testDataDir, 'T2.nii'),
+            os.path.join(testDataDir, 'FLAIR.nii'),
+            os.path.join(testDataDir, 'T1-precontrast.nii')
+        ]
+        print('TEST: sampleLabelFilename =', sampleLabelFilename)
+        batchSegmentationWidget.loadVolumesFromFiles(sampleVolFilenames)
+        batchSegmentationWidget.createSegmentationFromFile(sampleLabelFilename)
 
-    #     self.delayDisplay('Select Volumes')
-    #     baselineNode = braintumor1
-    #     followupNode = braintumor2
-    #     modelsegmentation_module.Step1._VolumeSelectStep__enableSubtractionMapping.setChecked(True)
-    #     modelsegmentation_module.Step1._VolumeSelectStep__baselineVolumeSelector.setCurrentNode(baselineNode)
-    #     modelsegmentation_module.Step1._VolumeSelectStep__followupVolumeSelector.setCurrentNode(followupNode)
-
-    #     self.delayDisplay('Go Forward')
-    #     modelsegmentation_module.workflow.goForward()
-
-    #     self.delayDisplay('Register Images')
-    #     modelsegmentation_module.Step2.onRegistrationRequest(wait_for_completion=True)
-
-    #     self.delayDisplay('Go Forward')
-    #     modelsegmentation_module.workflow.goForward()
-
-    #     self.delayDisplay('Normalize Images')
-    #     modelsegmentation_module.Step3.onGaussianNormalizationRequest()
-
-    #     self.delayDisplay('Subtract Images')
-    #     modelsegmentation_module.Step3.onSubtractionRequest(wait_for_completion=True)
-
-    #     self.delayDisplay('Go Forward')
-    #     modelsegmentation_module.workflow.goForward()
-
-    #     self.delayDisplay('Load model')
-
-    #     displayNode = slicer.vtkMRMLMarkupsDisplayNode()
-    #     slicer.mrmlScene.AddNode(displayNode)
-    #     inputMarkup = slicer.vtkMRMLMarkupsFiducialNode()
-    #     inputMarkup.SetName('Test')
-    #     slicer.mrmlScene.AddNode(inputMarkup)
-    #     inputMarkup.SetAndObserveDisplayNodeID(displayNode.GetID())
-
-    #     modelsegmentation_module.Step4._ROIStep__clippingMarkupSelector.setCurrentNode(inputMarkup)
-
-    #     inputMarkup.AddFiducial(35,-10,-10)
-    #     inputMarkup.AddFiducial(-15,20,-10)
-    #     inputMarkup.AddFiducial(-25,-25,-10)
-    #     inputMarkup.AddFiducial(-5,-60,-15)
-    #     inputMarkup.AddFiducial(-5,5,60)
-    #     inputMarkup.AddFiducial(-5,-35,-30)
-
-    #     self.delayDisplay('Go Forward')
-    #     modelsegmentation_module.workflow.goForward()
-
-    #     self.delayDisplay('Set Thresholds')
-    #     modelsegmentation_module.Step5._ThresholdStep__threshRange.minimumValue = 50
-    #     modelsegmentation_module.Step5._ThresholdStep__threshRange.maximumValue = 150
-
-    #     self.delayDisplay('Go Forward')
-    #     modelsegmentation_module.workflow.goForward()
-
-    #     self.delayDisplay('Restart Module')
-    #     modelsegmentation_module.Step6.Restart()
+        # saveActiveSegmentation()
 
         self.delayDisplay('Test passed!')
         

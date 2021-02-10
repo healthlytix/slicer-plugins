@@ -1,0 +1,19 @@
+{
+    "imageFilenamePatterns": [
+        "T1-postcontrast.nii",
+        "T2.nii",
+        "FLAIR.nii",
+        "T1-precontrast.nii"
+    ],
+    "labelFilenamePattern": "tumor-seg.nii",
+    "labelNames": {
+        "1": "necrotic / non-enhancing core",
+        "2": "peritumoral edema",
+        "3": "enhancing tumor"
+    },
+    "labelColors": {
+        "1": [255, 0, 0],
+        "2": [0, 255, 0],
+        "3": [0, 0, 255]
+    }
+}

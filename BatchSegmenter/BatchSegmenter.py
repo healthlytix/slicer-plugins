@@ -293,8 +293,8 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         labelToSegment = {str(label): segment for label, segment in zip(integerLabels, segments)}
         
         # verify that labels in label_fn match those in the config
-        existingLabelsHaveAreInConfig = [label in self.config['labelNames'] for label in labelToSegment]
-        if not all(existingLabelsHaveAreInConfig):
+        existingLabelsAreInConfig = [label in self.config['labelNames'] for label in labelToSegment]
+        if not all(existingLabelsAreInConfig):
             raise ValueError('Some of the integer labels in '+label_fn+' ('+str(labelToSegment.keys())+') '+' are missing from config ('+str(self.config['labelNames'].keys())+')')
 
         # set colors and names for segments
@@ -312,9 +312,8 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
                     continue
             else:  # label is missing from labelmap, create empty segment
                 print('INFO: Adding empty segment for class', labelName)
-                # segmentation.AddEmptySegment(str(labelVal), labelName, color)
-                segmentation.AddEmptySegment('', labelName, color)
-
+                segmentation.AddEmptySegment(str(labelVal), labelName, color)
+                
 
     def saveActiveSegmentation(self):
         print('INFO: BatchSegmenter.saveActiveSegmentation() invoked')

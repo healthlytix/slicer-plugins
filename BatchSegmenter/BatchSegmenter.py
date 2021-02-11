@@ -24,7 +24,7 @@ def loadLabelArrayFromFile(labelFilename):
     labelArray = slicer.util.arrayFromVolume(labelmapNode)
     slicer.mrmlScene.RemoveNode(labelmapNode)
     return labelArray
-    
+
 
 class BatchSegmenter(ScriptedLoadableModule):
 
@@ -335,14 +335,11 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             # Save to file
             if self.segmentationNode and self.segmentationNode.GetDisplayNode():
                 print('Saving seg to', self.active_label_fn)
+
                 visibleSegmentIds = vtk.vtkStringArray()
                 self.segmentationNode.GetDisplayNode().GetVisibleSegmentIDs(visibleSegmentIds)
-                
-                I can finally reproduce this error. When saving a segmentation where edema is an empty segment, it saves incorrectly -
-                it changes the enhancing label (3) to the next lower number (2), ie it changes enhancing to edema. I assume that if there
-                was an all-edema case, it would be changed to all-necrotic during the save (in the following lines)
-                
-                I think maybe the segs are in the wrong order? maybe delete empty segments?
+                # self.segmentationNode.ReorderSegments(visibleSegmentIds, '')
+                # ReorderSegments(std::vector<std::string> segmentIdsToMove, insertBeforeSegmentId ="")
                 
                 labelmapNode = slicer.vtkMRMLLabelMapVolumeNode()
                 slicer.mrmlScene.AddNode(labelmapNode)
@@ -364,11 +361,6 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             slicer.mrmlScene.RemoveNode(self.segmentationNode)
         self.segmentationNode = None
         self.volNodes = []
-
-        # FIXME: why is this necessary? whence the immortal segmentation nodes?
-        for node in slicer.util.getNodes().values():
-            if isinstance(node, slicer.vtkSegmentation):
-                slicer.mrmlScene.RemoveNode(node)
 
                 
     def cleanup(self):
@@ -420,7 +412,6 @@ class BatchSegmenterTest():
         batchSegmentationWidget = slicer.modules.BatchSegmenterWidget
 
         testDataDir = os.path.join(os.path.dirname(__file__), 'Data')
-        sampleLabelFilename = os.path.join(testDataDir, 'tumor-seg.nii')
         sampleVolFilenames = [
             os.path.join(testDataDir, 'T1-postcontrast.nii'),
             os.path.join(testDataDir, 'T2.nii'),
@@ -429,18 +420,39 @@ class BatchSegmenterTest():
         ]
         tempdir = tempfile.mkdtemp()
 
+        # # test round-trip with all segments
+        # sampleLabelFilename = os.path.join(testDataDir, 'tumor-seg.nii')
+        # originalSeg = loadLabelArrayFromFile(sampleLabelFilename)
+        # batchSegmentationWidget.loadVolumesFromFiles(sampleVolFilenames)
+        # batchSegmentationWidget.createSegmentationFromFile(sampleLabelFilename)
+        # testSegFilename = os.path.join(tempdir, 'tumor-seg-test.nii')
+        # batchSegmentationWidget.active_label_fn = testSegFilename
+        # batchSegmentationWidget.saveActiveSegmentation()
+        # finalSeg = loadLabelArrayFromFile(testSegFilename)
+        # try:
+        #     np.testing.assert_array_equal(originalSeg, finalSeg)
+        #     self.delayDisplay('Round trip segmentation read-write-read test 1 successful')
+        # except AssertionError as e:
+        #     self.delayDisplay('Round trip segmentation read-write-read test 1 FAILED')
+        #     raise e
+
+        # batchSegmentationWidget.clearNodes()
+
+        # test round-trip with segments labeled 1, 3 (no 2 ROI)
+        sampleLabelFilename = os.path.join(testDataDir, 'tumor-seg-missing-edema.nii')
         originalSeg = loadLabelArrayFromFile(sampleLabelFilename)
         batchSegmentationWidget.loadVolumesFromFiles(sampleVolFilenames)
         batchSegmentationWidget.createSegmentationFromFile(sampleLabelFilename)
-        testSegFilename = os.path.join(tempdir, 'tumor-seg.nii')
+        testSegFilename = os.path.join(tempdir, 'tumor-seg-test.nii')
         batchSegmentationWidget.active_label_fn = testSegFilename
         batchSegmentationWidget.saveActiveSegmentation()
         finalSeg = loadLabelArrayFromFile(testSegFilename)
         try:
             np.testing.assert_array_equal(originalSeg, finalSeg)
-            self.delayDisplay('Round trip segmentation read-write-read test successful')
-        except AssertionError:
-            self.delayDisplay('Round trip segmentation read-write-read test FAILED')
+            self.delayDisplay('Round trip segmentation read-write-read test 2 successful')
+        except AssertionError as e:
+            self.delayDisplay('Round trip segmentation read-write-read test 2 FAILED')
+            raise e
 
         batchSegmentationWidget.clearNodes()
         
@@ -448,7 +460,3 @@ class BatchSegmenterTest():
 
         self.delayDisplay('Tests passed!')
         
-    # except Exception, e:
-    #     import traceback
-    #     traceback.print_exc()
-    #     self.delayDisplay('Test caused exception!\n' + str(e))

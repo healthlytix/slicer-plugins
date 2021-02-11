@@ -52,20 +52,20 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.selectDataButton = qt.QPushButton('Select Data Folders')
         self.selectDataButton.toolTip = 'Select directory containing nifti/mgz files.'
         self.selectDataButton.enabled = True
-        dataFormLayout.addRow(qt.QLabel('Folder Names:'), self.selectDataButton)
+        dataFormLayout.addRow(qt.QLabel('Cases:'), self.selectDataButton)
 
         # Combobox to display selected folders
         self.caseComboBox = qt.QComboBox()
         self.caseComboBox.enabled = False
-        dataFormLayout.addRow(qt.QLabel('Active Folder:'), self.caseComboBox)
+        dataFormLayout.addRow(qt.QLabel('Active Case:'), self.caseComboBox)
 
         # Navigate images buttons
         navigateImagesLayout = qt.QHBoxLayout()
-        self.previousImageButton = qt.QPushButton('Previous Image')
+        self.previousImageButton = qt.QPushButton('Previous Case')
         self.previousImageButton.enabled = False
         navigateImagesLayout.addWidget(self.previousImageButton)
 
-        self.nextImageButton = qt.QPushButton('Next Image')
+        self.nextImageButton = qt.QPushButton('Next Case')
         self.nextImageButton.enabled = False
         navigateImagesLayout.addWidget(self.nextImageButton)
         dataFormLayout.addRow(navigateImagesLayout)

@@ -13,7 +13,7 @@ import logging
 def printNodes(prefix=''):
     print('TESTTEST ('+prefix+')')
     for node_name, node in slicer.util.getNodes().items():
-        if isinstance(node, slicer.vtkMRMLLabelMapVolumeNode):
+        if isinstance(node, slicer.vtkSegmentation):
             print('TESTTEST', node_name, type(node))
     print('---------------------------')
 
@@ -25,7 +25,7 @@ def loadLabelArrayFromFile(labelFilename):
     slicer.mrmlScene.RemoveNode(labelmapNode)
     return labelArray
     
-    
+
 class BatchSegmenter(ScriptedLoadableModule):
 
     def __init__(self, parent):
@@ -266,15 +266,6 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             print('Failed to load any volumes from folder '+text+'!')
             return
 
-    def clearNodes(self):
-        print('INFO: BatchSegmenter.clearNodes invoked')
-        for volNode in self.volNodes:
-            slicer.mrmlScene.RemoveNode(volNode)
-        if self.segmentationNode:
-            slicer.mrmlScene.RemoveNode(self.segmentationNode)  # FIXME: this doesn't seem to work
-        self.segmentationNode = None
-        self.volNodes = []
-
 
     def createSegmentationFromFile(self, label_fn):
         print('INFO: BatchSegmenter.createSegmentationFromFile invoked')
@@ -306,6 +297,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         if not all(existingLabelsHaveAreInConfig):
             raise ValueError('Some of the integer labels in '+label_fn+' ('+str(labelToSegment.keys())+') '+' are missing from config ('+str(self.config['labelNames'].keys())+')')
 
+        # set colors and names for segments
         for labelVal, labelName in self.config['labelNames'].items():
             color = np.array(self.config['labelColors'][labelVal], float) / 255
             if labelVal in labelToSegment:
@@ -320,12 +312,13 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
                     continue
             else:  # label is missing from labelmap, create empty segment
                 print('INFO: Adding empty segment for class', labelName)
+                # segmentation.AddEmptySegment(str(labelVal), labelName, color)
                 segmentation.AddEmptySegment('', labelName, color)
 
 
     def saveActiveSegmentation(self):
         print('INFO: BatchSegmenter.saveActiveSegmentation() invoked')
-
+        printNodes('saveSegmentation')
         if self.active_label_fn:
 
             # restore original label values
@@ -353,6 +346,21 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
                 slicer.mrmlScene.RemoveNode(labelmapNode)
                         
 
+    def clearNodes(self):
+        print('INFO: BatchSegmenter.clearNodes invoked')
+        for volNode in self.volNodes:
+            slicer.mrmlScene.RemoveNode(volNode)
+        if self.segmentationNode:
+            slicer.mrmlScene.RemoveNode(self.segmentationNode)
+        self.segmentationNode = None
+        self.volNodes = []
+
+        # FIXME: why is this necessary? whence the immortal segmentation nodes?
+        for node in slicer.util.getNodes().values():
+            if isinstance(node, slicer.vtkSegmentation):
+                slicer.mrmlScene.RemoveNode(node)
+
+                
     def cleanup(self):
         print('INFO: BatchSegmenter.cleanup() invoked')
         if self.segmentationNode:

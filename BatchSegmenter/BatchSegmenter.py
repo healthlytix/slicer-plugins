@@ -10,7 +10,22 @@ from slicer.ScriptedLoadableModule import *
 import logging
 
 
+def printNodes(prefix=''):
+    print('TESTTEST ('+prefix+')')
+    for node_name, node in slicer.util.getNodes().items():
+        if isinstance(node, slicer.vtkMRMLLabelMapVolumeNode):
+            print('TESTTEST', node_name, type(node))
+    print('---------------------------')
 
+
+def loadLabelArrayFromFile(labelFilename):
+    """Load raw numpy array from a label image file"""
+    labelmapNode = slicer.util.loadLabelVolume(labelFilename)
+    labelArray = slicer.util.arrayFromVolume(labelmapNode)
+    slicer.mrmlScene.RemoveNode(labelmapNode)
+    return labelArray
+    
+    
 class BatchSegmenter(ScriptedLoadableModule):
 
     def __init__(self, parent):
@@ -215,7 +230,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.active_label_fn = label_fn
 
         # remove existing nodes (if any)
-        self.clearBatchSegmenterNodes()
+        self.clearNodes()
         
         # TODO: if there's not label_fn, create empty seg
 
@@ -251,8 +266,8 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             print('Failed to load any volumes from folder '+text+'!')
             return
 
-    def clearBatchSegmenterNodes(self):
-        print('INFO: BatchSegmenter.clearBatchSegmenterNodes invoked')
+    def clearNodes(self):
+        print('INFO: BatchSegmenter.clearNodes invoked')
         for volNode in self.volNodes:
             slicer.mrmlScene.RemoveNode(volNode)
         if self.segmentationNode:
@@ -276,7 +291,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.segmentationNode.CreateDefaultDisplayNodes()
         slicer.mrmlScene.AddNode(self.segmentationNode)
         slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmapNode, self.segmentationNode)
-        self.segEditorWidget.setSegmentationNode(self.segmentationNode) 
+        self.segEditorWidget.setSegmentationNode(self.segmentationNode)
         slicer.mrmlScene.RemoveNode(labelmapNode)
 
         # figure out segment labels
@@ -342,8 +357,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         print('INFO: BatchSegmenter.cleanup() invoked')
         if self.segmentationNode:
             self.saveActiveSegmentation()
-        self.clearBatchSegmenterNodes()
-
+        self.clearNodes()
 
 
 class BatchSegmenterTest():
@@ -375,10 +389,10 @@ class BatchSegmenterTest():
     def runTest(self):
         """Run as few or as many tests as needed here."""
         self.setUp()
-        self.testSegmentationWizard()
+        self.testBatchSegmenter()
 
 
-    def testSegmentationWizard(self):
+    def testBatchSegmenter(self):
         self.delayDisplay('BatchSegmenter tests')
 
         self.delayDisplay('Creating BatchSegmenter widgets')
@@ -397,18 +411,22 @@ class BatchSegmenterTest():
         ]
         tempdir = tempfile.mkdtemp()
 
-        originalSeg = slicer.util.arrayFromVolume(slicer.util.loadLabelVolume(sampleLabelFilename))
+        originalSeg = loadLabelArrayFromFile(sampleLabelFilename)
         batchSegmentationWidget.loadVolumesFromFiles(sampleVolFilenames)
         batchSegmentationWidget.createSegmentationFromFile(sampleLabelFilename)
         testSegFilename = os.path.join(tempdir, 'tumor-seg.nii')
         batchSegmentationWidget.active_label_fn = testSegFilename
         batchSegmentationWidget.saveActiveSegmentation()
-        finalSeg = slicer.util.arrayFromVolume(slicer.util.loadLabelVolume(testSegFilename))
+        finalSeg = loadLabelArrayFromFile(testSegFilename)
         try:
             np.testing.assert_array_equal(originalSeg, finalSeg)
             self.delayDisplay('Round trip segmentation read-write-read test successful')
         except AssertionError:
             self.delayDisplay('Round trip segmentation read-write-read test FAILED')
+
+        batchSegmentationWidget.clearNodes()
+        
+        # slicer.util.reloadScriptedModule('BatchSegmenter')
 
         self.delayDisplay('Tests passed!')
         

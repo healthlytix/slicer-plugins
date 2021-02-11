@@ -268,7 +268,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
 
 
     def createSegmentationFromFile(self, label_fn):
-        print('INFO: BatchSegmenter.createSegmentationFromFile invoked')
+        print('INFO: BatchSegmenter.createSegmentationFromFile invoked', label_fn)
 
         # create label node as a labelVolume
         labelmapNode = slicer.util.loadLabelVolume(label_fn)
@@ -304,9 +304,9 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
                 try:
                     segment = labelToSegment[labelVal]
                     labelName = self.config['labelNames'][labelVal]
-                    print('INFO: Adding segment for label ', labelVal, ' as ', labelName)
                     segment.SetColor(color)
                     segment.SetName(labelName)
+                    print('INFO: Adding segment for label ', labelVal, ' as ', labelName)
                 except KeyError:
                     print('ERROR: problem getting label name or color for segment ', labelVal)
                     continue
@@ -316,9 +316,8 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
                 
 
     def saveActiveSegmentation(self):
-        print('INFO: BatchSegmenter.saveActiveSegmentation() invoked')
-        printNodes('saveSegmentation')
         if self.active_label_fn:
+            print('INFO: BatchSegmenter.saveActiveSegmentation() invoked', self.active_label_fn)
 
             # restore original label values
             segmentation = self.segmentationNode.GetSegmentation()
@@ -338,9 +337,21 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
                 print('Saving seg to', self.active_label_fn)
                 visibleSegmentIds = vtk.vtkStringArray()
                 self.segmentationNode.GetDisplayNode().GetVisibleSegmentIDs(visibleSegmentIds)
+                
+                I can finally reproduce this error. When saving a segmentation where edema is an empty segment, it saves incorrectly -
+                it changes the enhancing label (3) to the next lower number (2), ie it changes enhancing to edema. I assume that if there
+                was an all-edema case, it would be changed to all-necrotic during the save (in the following lines)
+                
+                I think maybe the segs are in the wrong order? maybe delete empty segments?
+                
                 labelmapNode = slicer.vtkMRMLLabelMapVolumeNode()
                 slicer.mrmlScene.AddNode(labelmapNode)
                 slicer.vtkSlicerSegmentationsModuleLogic.ExportSegmentsToLabelmapNode(self.segmentationNode, visibleSegmentIds, labelmapNode, self.volNodes[0])
+
+                integerLabels = np.unique(slicer.util.arrayFromVolume(labelmapNode))
+                integerLabels = np.delete(integerLabels, np.argwhere(integerLabels==0))  # remove background label
+                print('DEBUG: integerLabels', integerLabels)
+
                 slicer.util.saveNode(labelmapNode, self.active_label_fn)
                 slicer.mrmlScene.RemoveNode(labelmapNode)
                         

@@ -1,6 +1,7 @@
 import os
 import json
 from glob import glob
+import tempfile
 import unittest
 from collections import OrderedDict
 import numpy as np
@@ -394,13 +395,22 @@ class BatchSegmenterTest():
             os.path.join(testDataDir, 'FLAIR.nii'),
             os.path.join(testDataDir, 'T1-precontrast.nii')
         ]
-        print('TEST: sampleLabelFilename =', sampleLabelFilename)
+        tempdir = tempfile.mkdtemp()
+
+        originalSeg = slicer.util.arrayFromVolume(slicer.util.loadLabelVolume(sampleLabelFilename))
         batchSegmentationWidget.loadVolumesFromFiles(sampleVolFilenames)
         batchSegmentationWidget.createSegmentationFromFile(sampleLabelFilename)
+        testSegFilename = os.path.join(tempdir, 'tumor-seg.nii')
+        batchSegmentationWidget.active_label_fn = testSegFilename
+        batchSegmentationWidget.saveActiveSegmentation()
+        finalSeg = slicer.util.arrayFromVolume(slicer.util.loadLabelVolume(testSegFilename))
+        try:
+            np.testing.assert_array_equal(originalSeg, finalSeg)
+            self.delayDisplay('Round trip segmentation read-write-read test successful')
+        except AssertionError:
+            self.delayDisplay('Round trip segmentation read-write-read test FAILED')
 
-        # saveActiveSegmentation()
-
-        self.delayDisplay('Test passed!')
+        self.delayDisplay('Tests passed!')
         
     # except Exception, e:
     #     import traceback

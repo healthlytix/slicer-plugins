@@ -2,28 +2,12 @@ import os
 import json
 from glob import glob
 import tempfile
-import unittest
+import traceback
 from collections import OrderedDict
 import numpy as np
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import logging
-
-
-def printNodes(prefix=''):
-    print('TESTTEST ('+prefix+')')
-    for node_name, node in slicer.util.getNodes().items():
-        if isinstance(node, slicer.vtkSegmentation):
-            print('TESTTEST', node_name, type(node))
-    print('---------------------------')
-
-
-def loadLabelArrayFromFile(labelFilename):
-    """Load raw numpy array from a label image file"""
-    labelmapNode = slicer.util.loadLabelVolume(labelFilename)
-    labelArray = slicer.util.arrayFromVolume(labelmapNode)
-    slicer.mrmlScene.RemoveNode(labelmapNode)
-    return labelArray
 
 
 class BatchSegmenter(ScriptedLoadableModule):
@@ -336,19 +320,15 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             if self.segmentationNode and self.segmentationNode.GetDisplayNode():
                 print('Saving seg to', self.active_label_fn)
 
+                # make a list of segment IDs *that are always ordered correctly*
                 visibleSegmentIds = vtk.vtkStringArray()
-                self.segmentationNode.GetDisplayNode().GetVisibleSegmentIDs(visibleSegmentIds)
-                # self.segmentationNode.ReorderSegments(visibleSegmentIds, '')
-                # ReorderSegments(std::vector<std::string> segmentIdsToMove, insertBeforeSegmentId ="")
+                for labelVal in self.config['labelNames']:  # assumes that the config list of labelNames is in order
+                    visibleSegmentIds.InsertNextValue(labelVal)
+                visibleSegmentIdsList = [visibleSegmentIds.GetValue(ind) for ind in range(visibleSegmentIds.GetNumberOfValues())]
                 
                 labelmapNode = slicer.vtkMRMLLabelMapVolumeNode()
                 slicer.mrmlScene.AddNode(labelmapNode)
                 slicer.vtkSlicerSegmentationsModuleLogic.ExportSegmentsToLabelmapNode(self.segmentationNode, visibleSegmentIds, labelmapNode, self.volNodes[0])
-
-                integerLabels = np.unique(slicer.util.arrayFromVolume(labelmapNode))
-                integerLabels = np.delete(integerLabels, np.argwhere(integerLabels==0))  # remove background label
-                print('DEBUG: integerLabels', integerLabels)
-
                 slicer.util.saveNode(labelmapNode, self.active_label_fn)
                 slicer.mrmlScene.RemoveNode(labelmapNode)
                         
@@ -368,6 +348,14 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         if self.segmentationNode:
             self.saveActiveSegmentation()
         self.clearNodes()
+
+
+def loadLabelArrayFromFile(labelFilename):
+    """Load raw numpy array from a label image file"""
+    labelmapNode = slicer.util.loadLabelVolume(labelFilename)
+    labelArray = slicer.util.arrayFromVolume(labelmapNode)
+    slicer.mrmlScene.RemoveNode(labelmapNode)
+    return labelArray
 
 
 class BatchSegmenterTest():
@@ -420,25 +408,25 @@ class BatchSegmenterTest():
         ]
         tempdir = tempfile.mkdtemp()
 
-        # # test round-trip with all segments
-        # sampleLabelFilename = os.path.join(testDataDir, 'tumor-seg.nii')
-        # originalSeg = loadLabelArrayFromFile(sampleLabelFilename)
-        # batchSegmentationWidget.loadVolumesFromFiles(sampleVolFilenames)
-        # batchSegmentationWidget.createSegmentationFromFile(sampleLabelFilename)
-        # testSegFilename = os.path.join(tempdir, 'tumor-seg-test.nii')
-        # batchSegmentationWidget.active_label_fn = testSegFilename
-        # batchSegmentationWidget.saveActiveSegmentation()
-        # finalSeg = loadLabelArrayFromFile(testSegFilename)
-        # try:
-        #     np.testing.assert_array_equal(originalSeg, finalSeg)
-        #     self.delayDisplay('Round trip segmentation read-write-read test 1 successful')
-        # except AssertionError as e:
-        #     self.delayDisplay('Round trip segmentation read-write-read test 1 FAILED')
-        #     raise e
+        # test round-trip with all segments
+        sampleLabelFilename = os.path.join(testDataDir, 'tumor-seg.nii')
+        originalSeg = loadLabelArrayFromFile(sampleLabelFilename)
+        batchSegmentationWidget.loadVolumesFromFiles(sampleVolFilenames)
+        batchSegmentationWidget.createSegmentationFromFile(sampleLabelFilename)
+        testSegFilename = os.path.join(tempdir, 'tumor-seg-test.nii')
+        batchSegmentationWidget.active_label_fn = testSegFilename
+        batchSegmentationWidget.saveActiveSegmentation()
+        finalSeg = loadLabelArrayFromFile(testSegFilename)
+        try:
+            np.testing.assert_array_equal(originalSeg, finalSeg)
+            self.delayDisplay('Round trip segmentation read-write-read test 1 successful')
+        except AssertionError as e:
+            self.delayDisplay('Round trip segmentation read-write-read test 1 FAILED')
+            raise e
 
-        # batchSegmentationWidget.clearNodes()
+        batchSegmentationWidget.clearNodes()
 
-        # test round-trip with segments labeled 1, 3 (no 2 ROI)
+        # test round-trip with segments labeled 1, 3 (no edema/label 2 ROI)
         sampleLabelFilename = os.path.join(testDataDir, 'tumor-seg-missing-edema.nii')
         originalSeg = loadLabelArrayFromFile(sampleLabelFilename)
         batchSegmentationWidget.loadVolumesFromFiles(sampleVolFilenames)
@@ -456,7 +444,5 @@ class BatchSegmenterTest():
 
         batchSegmentationWidget.clearNodes()
         
-        # slicer.util.reloadScriptedModule('BatchSegmenter')
-
         self.delayDisplay('Tests passed!')
-        
+    

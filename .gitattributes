@@ -1,0 +1,2 @@
+Data/*.nii filter=lfs diff=lfs merge=lfs -text
+BatchSegmenter/Data/tumor-seg-missing-edema.nii filter=lfs diff=lfs merge=lfs -text

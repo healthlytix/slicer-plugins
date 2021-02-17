@@ -1,13 +1,13 @@
 import os
 import json
 from glob import glob
-import unittest
+import tempfile
+import traceback
 from collections import OrderedDict
 import numpy as np
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import logging
-
 
 
 class BatchSegmenter(ScriptedLoadableModule):
@@ -23,6 +23,10 @@ class BatchSegmenter(ScriptedLoadableModule):
         self.parent.acknowledgementText = """"""
 
 
+"""
+Possibly relevant example: https://github.com/Slicer/Slicer/blob/a18612bb2584018822347ff4db16439b5c578e00/Utilities/Templates/Modules/Scripted/TemplateKey.py#L104-L108
+Use VTKObservationMixin and removeObservers()
+"""
 class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
 
     def setup(self):
@@ -48,20 +52,20 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.selectDataButton = qt.QPushButton('Select Data Folders')
         self.selectDataButton.toolTip = 'Select directory containing nifti/mgz files.'
         self.selectDataButton.enabled = True
-        dataFormLayout.addRow(qt.QLabel('Folder Names:'), self.selectDataButton)
+        dataFormLayout.addRow(qt.QLabel('Cases:'), self.selectDataButton)
 
         # Combobox to display selected folders
         self.caseComboBox = qt.QComboBox()
         self.caseComboBox.enabled = False
-        dataFormLayout.addRow(qt.QLabel('Active Folder:'), self.caseComboBox)
+        dataFormLayout.addRow(qt.QLabel('Active Case:'), self.caseComboBox)
 
         # Navigate images buttons
         navigateImagesLayout = qt.QHBoxLayout()
-        self.previousImageButton = qt.QPushButton('Previous Image')
+        self.previousImageButton = qt.QPushButton('Previous Case')
         self.previousImageButton.enabled = False
         navigateImagesLayout.addWidget(self.previousImageButton)
 
-        self.nextImageButton = qt.QPushButton('Next Image')
+        self.nextImageButton = qt.QPushButton('Next Case')
         self.nextImageButton.enabled = False
         navigateImagesLayout.addWidget(self.nextImageButton)
         dataFormLayout.addRow(navigateImagesLayout)
@@ -98,6 +102,8 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
 
         ### Logic ###
         self.image_label_dict = OrderedDict()
+        self.segmentationNode = None
+        self.volNodes = []
         self.selected_image_ind = None
         self.active_label_fn = None
         self.dataFolders = None
@@ -173,17 +179,33 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
 
 
     def onComboboxChanged(self, text):
+        """Load a new case when the user selects from the cases combobox
+
+        This is the main function for loading images from disk, configuring the views, and creating
+        a segmentation with the correct display names/colors.
+
+        Arg:
+            text (str): the name of the case (which was derived from the directory name). Should be 
+                a key in ``self.image_label_dict``
+
+        Raises:
+            ValueError: if the config is missing name/color for one of the integer labels in the 
+                label file
+        """
         
         if not self.image_label_dict:
             return
 
         # save old seg before loading the new one
-        self.saveActiveSegmentation()
+        if self.segmentationNode:
+            self.saveActiveSegmentation()
+
         try:
             self.selected_image_ind = list(self.image_label_dict.keys()).index(text)
         except ValueError:
             return
 
+        # select the filenames for this case
         try:
             im_fns, label_fn = self.image_label_dict[text]
         except KeyError:
@@ -192,36 +214,50 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.active_label_fn = label_fn
 
         # remove existing nodes (if any)
-        if hasattr(self, 'volNodes'):
-            for volNode in self.volNodes:
-                slicer.mrmlScene.RemoveNode(volNode)
-        if hasattr(self, 'segmentationNode'):
-            slicer.mrmlScene.RemoveNode(self.segmentationNode)
+        self.clearNodes()
         
         # TODO: if there's not label_fn, create empty seg
-        
-        # set red/green/yellow views to axial orientation
+
+        # make all slice views axial before loading volumes
         sliceNodes = slicer.util.getNodesByClass('vtkMRMLSliceNode')
         for sliceNode in sliceNodes:
             sliceNode.SetOrientationToAxial()
-
-        # create label node as a labelVolume
-        [success, labelmapNode] = slicer.util.loadLabelVolume(label_fn, returnNode=True)
-        if not success:
-            print('Failed to load label volume ', label_fn)
-            return
-                
+        
         # create vol nodes
+        self.loadVolumesFromFiles(im_fns)
+
+        # create segmentation
+        self.createSegmentationFromFile(label_fn)
+
+        # configure views
+        for volNode, view_name in zip(self.volNodes, ['Red', 'Yellow', 'Green']):
+            view = slicer.app.layoutManager().sliceWidget(view_name)
+            view.sliceLogic().GetSliceCompositeNode().SetBackgroundVolumeID(volNode.GetID())
+            view.sliceLogic().GetSliceCompositeNode().SetLinkedControl(True)
+            view.mrmlSliceNode().RotateToVolumePlane(volNode)
+            view.sliceController().setSliceVisible(True)  # show in 3d view
+                
+    def loadVolumesFromFiles(self, filenames):
         self.volNodes = []
-        for im_fn in im_fns:
-            [success, vol_node] = slicer.util.loadVolume(im_fn, returnNode=True)
-            vol_node.GetScalarVolumeDisplayNode().SetInterpolate(0)
-            if success:
-                self.volNodes.append(vol_node)
+        for im_fn in filenames:
+            volNode = slicer.util.loadVolume(im_fn)
+            if volNode:
+                volNode.GetScalarVolumeDisplayNode().SetInterpolate(0)
+                self.volNodes.append(volNode)
             else:
                 print('WARNING: Failed to load volume ', im_fn)
         if len(self.volNodes) == 0:
             print('Failed to load any volumes from folder '+text+'!')
+            return
+
+
+    def createSegmentationFromFile(self, label_fn):
+        print('INFO: BatchSegmenter.createSegmentationFromFile invoked', label_fn)
+
+        # create label node as a labelVolume
+        labelmapNode = slicer.util.loadLabelVolume(label_fn)
+        if not labelmapNode:
+            print('Failed to load label volume ', label_fn)
             return
 
         # create segmentation node from labelVolume
@@ -230,7 +266,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.segmentationNode.CreateDefaultDisplayNodes()
         slicer.mrmlScene.AddNode(self.segmentationNode)
         slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmapNode, self.segmentationNode)
-        self.segEditorWidget.setSegmentationNode(self.segmentationNode) 
+        self.segEditorWidget.setSegmentationNode(self.segmentationNode)
         slicer.mrmlScene.RemoveNode(labelmapNode)
 
         # figure out segment labels
@@ -241,39 +277,31 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         labelToSegment = {str(label): segment for label, segment in zip(integerLabels, segments)}
         
         # verify that labels in label_fn match those in the config
-        existingLabelsHaveAreInConfig = [label in self.config['labelNames'] for label in labelToSegment]
-        if not all(existingLabelsHaveAreInConfig):
+        existingLabelsAreInConfig = [label in self.config['labelNames'] for label in labelToSegment]
+        if not all(existingLabelsAreInConfig):
             raise ValueError('Some of the integer labels in '+label_fn+' ('+str(labelToSegment.keys())+') '+' are missing from config ('+str(self.config['labelNames'].keys())+')')
 
+        # set colors and names for segments
         for labelVal, labelName in self.config['labelNames'].items():
             color = np.array(self.config['labelColors'][labelVal], float) / 255
-            print('DEBUG: labelVal', labelVal)
             if labelVal in labelToSegment:
                 try:
                     segment = labelToSegment[labelVal]
                     labelName = self.config['labelNames'][labelVal]
-                    print('INFO: Adding segment for label ', labelVal, ' as ', labelName)
                     segment.SetColor(color)
                     segment.SetName(labelName)
+                    print('INFO: Adding segment for label ', labelVal, ' as ', labelName)
                 except KeyError:
                     print('ERROR: problem getting label name or color for segment ', labelVal)
                     continue
             else:  # label is missing from labelmap, create empty segment
                 print('INFO: Adding empty segment for class', labelName)
-                segmentation.AddEmptySegment('', labelName, color)
-
-        # configure views
-        view_names = ['Red', 'Yellow', 'Green']
-        for vol_node, view_name in zip(self.volNodes, view_names):
-            view = slicer.app.layoutManager().sliceWidget(view_name)
-            view.sliceLogic().GetSliceCompositeNode().SetBackgroundVolumeID(vol_node.GetID())
-            view.sliceLogic().GetSliceCompositeNode().SetLinkedControl(True)
-            view.mrmlSliceNode().RotateToVolumePlane(vol_node)
-            view.sliceController().setSliceVisible(True)  # show in 3d view
+                segmentation.AddEmptySegment(str(labelVal), labelName, color)
                 
 
     def saveActiveSegmentation(self):
         if self.active_label_fn:
+            print('INFO: BatchSegmenter.saveActiveSegmentation() invoked', self.active_label_fn)
 
             # restore original label values
             segmentation = self.segmentationNode.GetSegmentation()
@@ -289,28 +317,132 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
                     return
 
             # Save to file
-            print('Saving seg to', self.active_label_fn)
-            visibleSegmentIds = vtk.vtkStringArray()
-            self.segmentationNode.GetDisplayNode().GetVisibleSegmentIDs(visibleSegmentIds)
-            labelmapNode = slicer.vtkMRMLLabelMapVolumeNode()
-            slicer.mrmlScene.AddNode(labelmapNode)
-            slicer.vtkSlicerSegmentationsModuleLogic.ExportSegmentsToLabelmapNode(self.segmentationNode, visibleSegmentIds, labelmapNode, self.volNodes[0])
-            slicer.util.saveNode(labelmapNode, self.active_label_fn)
-            slicer.mrmlScene.RemoveNode(labelmapNode)
-            slicer.mrmlScene.RemoveNode(self.segmentationNode.GetDisplayNode())
-            slicer.mrmlScene.RemoveNode(self.segmentationNode)
-            self.segmentationNode = None
-            
+            if self.segmentationNode and self.segmentationNode.GetDisplayNode():
+                print('Saving seg to', self.active_label_fn)
 
-    def cleanup(self):
-        try:
-            self.saveActiveSegmentation()
-        except:
-            pass
-        try:
+                # make a list of segment IDs *that are always ordered correctly*
+                visibleSegmentIds = vtk.vtkStringArray()
+                for labelVal in self.config['labelNames']:  # assumes that the config list of labelNames is in order
+                    visibleSegmentIds.InsertNextValue(labelVal)
+                visibleSegmentIdsList = [visibleSegmentIds.GetValue(ind) for ind in range(visibleSegmentIds.GetNumberOfValues())]
+                
+                labelmapNode = slicer.vtkMRMLLabelMapVolumeNode()
+                slicer.mrmlScene.AddNode(labelmapNode)
+                slicer.vtkSlicerSegmentationsModuleLogic.ExportSegmentsToLabelmapNode(self.segmentationNode, visibleSegmentIds, labelmapNode, self.volNodes[0])
+                slicer.util.saveNode(labelmapNode, self.active_label_fn)
+                slicer.mrmlScene.RemoveNode(labelmapNode)
+                        
+
+    def clearNodes(self):
+        print('INFO: BatchSegmenter.clearNodes invoked')
+        for volNode in self.volNodes:
+            slicer.mrmlScene.RemoveNode(volNode)
+        if self.segmentationNode:
             slicer.mrmlScene.RemoveNode(self.segmentationNode)
-            del self.segmentationNode
-        except:
-            pass
+        self.segmentationNode = None
+        self.volNodes = []
+
+                
+    def cleanup(self):
+        print('INFO: BatchSegmenter.cleanup() invoked')
+        if self.segmentationNode:
+            self.saveActiveSegmentation()
+        self.clearNodes()
+
+
+def loadLabelArrayFromFile(labelFilename):
+    """Load raw numpy array from a label image file"""
+    labelmapNode = slicer.util.loadLabelVolume(labelFilename)
+    labelArray = slicer.util.arrayFromVolume(labelmapNode)
+    slicer.mrmlScene.RemoveNode(labelmapNode)
+    return labelArray
+
+
+class BatchSegmenterTest():
+
+    def delayDisplay(self, message, msec=150):
+        """Display a small dialog and wait
+    
+        This does two things: 1) it lets the event loop catch up
+        to the state of the test so that rendering and widget updates
+        have all taken place before the test continues and 2) it
+        shows the user/developer/tester the state of the test
+        so that we'll know when it breaks
+        """
+        print('TEST:', message)
+        self.info = qt.QDialog()
+        self.infoLayout = qt.QVBoxLayout()
+        self.info.setLayout(self.infoLayout)
+        self.label = qt.QLabel(message,self.info)
+        self.infoLayout.addWidget(self.label)
+        qt.QTimer.singleShot(msec, self.info.close)
+        self.info.exec_()
+
+
+    def setUp(self):
+        """ Do whatever is needed to reset the state - typically a scene clear will be enough."""
         slicer.mrmlScene.Clear(0)
+
+
+    def runTest(self):
+        """Run as few or as many tests as needed here."""
+        self.setUp()
+        self.testBatchSegmenter()
+
+
+    def testBatchSegmenter(self):
+        self.delayDisplay('BatchSegmenter tests')
+
+        self.delayDisplay('Creating BatchSegmenter widgets')
         
+        mainWindow = slicer.util.mainWindow()
+        mainWindow.moduleSelector().selectModule('BatchSegmenter')
+        batchSegmentationWidget = slicer.modules.BatchSegmenterWidget
+
+        testDataDir = os.path.join(os.path.dirname(__file__), 'Data')
+        sampleVolFilenames = [
+            os.path.join(testDataDir, 'T1-postcontrast.nii'),
+            os.path.join(testDataDir, 'T2.nii'),
+            os.path.join(testDataDir, 'FLAIR.nii'),
+            os.path.join(testDataDir, 'T1-precontrast.nii')
+        ]
+        tempdir = tempfile.mkdtemp()
+
+        # test round-trip with all segments
+        sampleLabelFilename = os.path.join(testDataDir, 'tumor-seg.nii')
+        originalSeg = loadLabelArrayFromFile(sampleLabelFilename)
+        batchSegmentationWidget.loadVolumesFromFiles(sampleVolFilenames)
+        batchSegmentationWidget.createSegmentationFromFile(sampleLabelFilename)
+        testSegFilename = os.path.join(tempdir, 'tumor-seg-test.nii')
+        batchSegmentationWidget.active_label_fn = testSegFilename
+        batchSegmentationWidget.saveActiveSegmentation()
+        finalSeg = loadLabelArrayFromFile(testSegFilename)
+        try:
+            np.testing.assert_array_equal(originalSeg, finalSeg)
+            self.delayDisplay('Round trip segmentation read-write-read test 1 successful')
+        except AssertionError as e:
+            self.delayDisplay('Round trip segmentation read-write-read test 1 FAILED')
+            raise e
+
+        batchSegmentationWidget.clearNodes()
+
+        # test round-trip with segments labeled 1, 3 (no edema/label 2 ROI)
+        sampleLabelFilename = os.path.join(testDataDir, 'tumor-seg-missing-edema.nii')
+        originalSeg = loadLabelArrayFromFile(sampleLabelFilename)
+        batchSegmentationWidget.loadVolumesFromFiles(sampleVolFilenames)
+        batchSegmentationWidget.createSegmentationFromFile(sampleLabelFilename)
+        testSegFilename = os.path.join(tempdir, 'tumor-seg-test.nii')
+        batchSegmentationWidget.active_label_fn = testSegFilename
+        batchSegmentationWidget.saveActiveSegmentation()
+        finalSeg = loadLabelArrayFromFile(testSegFilename)
+        try:
+            np.testing.assert_array_equal(originalSeg, finalSeg)
+            self.delayDisplay('Round trip segmentation read-write-read test 2 successful')
+        except AssertionError as e:
+            self.delayDisplay('Round trip segmentation read-write-read test 2 FAILED')
+            raise e
+
+        batchSegmentationWidget.clearNodes()
+        
+        self.delayDisplay('Tests passed!')
+    

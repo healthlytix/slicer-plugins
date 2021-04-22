@@ -66,7 +66,7 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
         navigateImagesLayout.addWidget(self.nextImageButton)
         dataFormLayout.addRow(navigateImagesLayout)
 
-        #### Segmentation Area ####
+        # #### Segmentation Area ####
 
         self.segCollapsibleButton = ctk.ctkCollapsibleButton()
         self.segCollapsibleButton.text = 'Segmentation'
@@ -84,7 +84,7 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
         self.segEditorWidget.setSwitchToSegmentationsButtonVisible(False)
         self.segEditorWidget.setSegmentationNodeSelectorVisible(False)
         self.segEditorWidget.setMasterVolumeNodeSelectorVisible(False)
-        self.segEditorWidget.setReadOnly(False)
+        self.segEditorWidget.setReadOnly(True)
         segFormLayout.addRow(self.segEditorWidget)
 
         ## Add vertical spacer to keep widgets near top
@@ -103,6 +103,10 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
         self.selected_image_ind = None
         self.active_label_fn = None
         self.dataFolders = None
+
+        # debug
+        self.image_label_dict = OrderedDict([('test-data', (['/Users/brian/apps/slicer-plugins/test-data/T1-postcontrast.nii', '/Users/brian/apps/slicer-plugins/test-data/T2.nii', '/Users/brian/apps/slicer-plugins/test-data/FLAIR.nii', '/Users/brian/apps/slicer-plugins/test-data/T1-precontrast.nii'], '/Users/brian/apps/slicer-plugins/test-data/tumor-seg.nii'))])
+        self.updateWidgets()
 
 
     def onSelectDataButtonPressed(self):
@@ -229,6 +233,7 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
             view.mrmlSliceNode().RotateToVolumePlane(volNode)
             view.sliceController().setSliceVisible(True)  # show in 3d view
                 
+
     def loadVolumesFromFiles(self, filenames):
         self.volNodes = []
         for im_fn in filenames:
@@ -239,7 +244,7 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
             else:
                 print('WARNING: Failed to load volume ', im_fn)
         if len(self.volNodes) == 0:
-            print('Failed to load any volumes from folder '+text+'!')
+            print('Failed to load any volumes ({filenames})!')
             return
 
 

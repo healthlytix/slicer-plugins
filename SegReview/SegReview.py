@@ -66,11 +66,28 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
         navigateImagesLayout.addWidget(self.nextImageButton)
         dataFormLayout.addRow(navigateImagesLayout)
 
+        # Widget for selecting view orientation on red/green/yellow slice Widgets
+        dataFormLayout.addRow('', qt.QLabel(''))  # empty row, for spacing
+        selectViewLayout = qt.QHBoxLayout()
+        self.viewButtonGroup = qt.QButtonGroup(dataFormLayout)
+        axialButton = qt.QRadioButton('axial')
+        self.viewButtonGroup.addButton(axialButton)
+        selectViewLayout.addWidget(axialButton)
+        sagittalButton = qt.QRadioButton('sagittal')
+        self.viewButtonGroup.addButton(sagittalButton)
+        selectViewLayout.addWidget(sagittalButton)
+        coronalButton = qt.QRadioButton('coronal')
+        self.viewButtonGroup.addButton(coronalButton)
+        selectViewLayout.addWidget(coronalButton)
+        dataFormLayout.addRow('View:', selectViewLayout)
+
+        
         # #### Segmentation Area ####
 
         self.segCollapsibleButton = ctk.ctkCollapsibleButton()
         self.segCollapsibleButton.text = 'Segmentation'
-        self.segCollapsibleButton.collapsed = False
+        # self.segCollapsibleButton.collapsed = False
+        self.segCollapsibleButton.collapsed = True  # TEMP DEBUG
         self.layout.addWidget(self.segCollapsibleButton)
 
         # Layout within the dummy collapsible button
@@ -95,6 +112,7 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
         self.previousImageButton.connect('clicked(bool)', self.previousImage)
         self.nextImageButton.connect('clicked(bool)', self.nextImage)
         self.caseComboBox.connect('currentIndexChanged(const QString&)', self.onComboboxChanged)
+        self.viewButtonGroup.buttonClicked.connect(self.onViewOrientationChanged)
 
         ### Logic ###
         self.image_label_dict = OrderedDict()
@@ -104,9 +122,13 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
         self.active_label_fn = None
         self.dataFolders = None
 
-        # debug
+        # TEMP DEBUG
         self.image_label_dict = OrderedDict([('test-data', (['/Users/brian/apps/slicer-plugins/test-data/T1-postcontrast.nii', '/Users/brian/apps/slicer-plugins/test-data/T2.nii', '/Users/brian/apps/slicer-plugins/test-data/FLAIR.nii', '/Users/brian/apps/slicer-plugins/test-data/T1-precontrast.nii'], '/Users/brian/apps/slicer-plugins/test-data/tumor-seg.nii'))])
         self.updateWidgets()
+
+
+    def onViewOrientationChanged(self, button):
+        print('set orientation to:', button.text)
 
 
     def onSelectDataButtonPressed(self):

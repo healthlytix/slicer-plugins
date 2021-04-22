@@ -48,12 +48,12 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
         self.selectDataButton = qt.QPushButton('Select Data Folders')
         self.selectDataButton.toolTip = 'Select directory containing nifti/mgz files.'
         self.selectDataButton.enabled = True
-        dataFormLayout.addRow(qt.QLabel('Cases:'), self.selectDataButton)
+        dataFormLayout.addRow('Cases:', self.selectDataButton)
 
         # Combobox to display selected folders
         self.caseComboBox = qt.QComboBox()
         self.caseComboBox.enabled = False
-        dataFormLayout.addRow(qt.QLabel('Active Case:'), self.caseComboBox)
+        dataFormLayout.addRow('Active Case:', self.caseComboBox)
 
         # Navigate images buttons
         navigateImagesLayout = qt.QHBoxLayout()
@@ -66,7 +66,7 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
         navigateImagesLayout.addWidget(self.nextImageButton)
         dataFormLayout.addRow(navigateImagesLayout)
 
-        # Widget for selecting view orientation on red/green/yellow slice Widgets
+        # Widget for selecting view orientations
         dataFormLayout.addRow('', qt.QLabel(''))  # empty row, for spacing
         selectViewLayout = qt.QHBoxLayout()
         self.viewButtonGroup = qt.QButtonGroup(dataFormLayout)
@@ -80,7 +80,15 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
         coronalButton = qt.QRadioButton('coronal')
         self.viewButtonGroup.addButton(coronalButton)
         selectViewLayout.addWidget(coronalButton)
-        dataFormLayout.addRow('View:', selectViewLayout)
+        dataFormLayout.addRow('Orientation:', selectViewLayout)
+
+        # Combobox for red/green/yellow slice views
+        self.redViewImage = qt.QComboBox()
+        dataFormLayout.addRow('Red View Image:', self.redViewImage)
+        self.greenViewImage = qt.QComboBox()
+        dataFormLayout.addRow('Green View Image:', self.greenViewImage)
+        self.yellowViewImage = qt.QComboBox()
+        dataFormLayout.addRow('Yellow View Image:', self.yellowViewImage)
 
         
         # #### Segmentation Area ####
@@ -118,7 +126,7 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
         ### Logic ###
         self.image_label_dict = OrderedDict()
         self.segmentationNode = None
-        self.volNodes = []
+        self.volNodes = OrderedDict()
         self.selected_image_ind = None
         self.active_label_fn = None
         self.dataFolders = None
@@ -143,7 +151,7 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
                 print('ERROR: unknown orientation', button.text)
 
         # rotate to volume plane
-        for volNode, view_name in zip(self.volNodes, ['Red', 'Yellow', 'Green']):
+        for volNode, view_name in zip(self.volNodes.values(), ['Red', 'Yellow', 'Green']):
             view = slicer.app.layoutManager().sliceWidget(view_name)
             view.mrmlSliceNode().RotateToVolumePlane(volNode)
         
@@ -265,7 +273,7 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
         self.createSegmentationFromFile(label_fn)
 
         # configure views
-        for volNode, view_name in zip(self.volNodes, ['Red', 'Yellow', 'Green']):
+        for volNode, view_name in zip(self.volNodes.values(), ['Red', 'Yellow', 'Green']):
             view = slicer.app.layoutManager().sliceWidget(view_name)
             view.sliceLogic().GetSliceCompositeNode().SetBackgroundVolumeID(volNode.GetID())
             view.sliceLogic().GetSliceCompositeNode().SetLinkedControl(True)
@@ -274,12 +282,13 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
                 
 
     def loadVolumesFromFiles(self, filenames):
-        self.volNodes = []
+        self.volNodes = OrderedDict()
         for im_fn in filenames:
             volNode = slicer.util.loadVolume(im_fn)
             if volNode:
                 volNode.GetScalarVolumeDisplayNode().SetInterpolate(0)
-                self.volNodes.append(volNode)
+                base_im_fn = os.path.splitext(os.path.basename(im_fn))[0]
+                self.volNodes[base_im_fn] = volNode
             else:
                 print('WARNING: Failed to load volume ', im_fn)
         if len(self.volNodes) == 0:
@@ -298,7 +307,7 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
 
         # create segmentation node from labelVolume
         self.segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode', 'Tumor Segmentation')
-        self.segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(self.volNodes[0])
+        self.segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(list(self.volNodes.values())[0])
         self.segmentationNode.CreateDefaultDisplayNodes()
         slicer.mrmlScene.AddNode(self.segmentationNode)
         slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmapNode, self.segmentationNode)
@@ -337,12 +346,12 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
 
     def clearNodes(self):
         print('INFO: SegReview.clearNodes invoked')
-        for volNode in self.volNodes:
+        for volNode in self.volNodes.values():
             slicer.mrmlScene.RemoveNode(volNode)
         if self.segmentationNode:
             slicer.mrmlScene.RemoveNode(self.segmentationNode)
         self.segmentationNode = None
-        self.volNodes = []
+        self.volNodes = OrderedDict()
 
                 
     def cleanup(self):

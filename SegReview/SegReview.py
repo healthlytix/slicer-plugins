@@ -71,6 +71,7 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
         selectViewLayout = qt.QHBoxLayout()
         self.viewButtonGroup = qt.QButtonGroup(dataFormLayout)
         axialButton = qt.QRadioButton('axial')
+        axialButton.setChecked(True)
         self.viewButtonGroup.addButton(axialButton)
         selectViewLayout.addWidget(axialButton)
         sagittalButton = qt.QRadioButton('sagittal')
@@ -128,8 +129,24 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
 
 
     def onViewOrientationChanged(self, button):
-        print('set orientation to:', button.text)
 
+        # set orientations
+        sliceNodes = slicer.util.getNodesByClass('vtkMRMLSliceNode')
+        for sliceNode in sliceNodes:
+            if button.text == 'axial':
+                sliceNode.SetOrientationToAxial()
+            elif button.text == 'sagittal':
+                sliceNode.SetOrientationToSagittal()
+            elif button.text == 'coronal':
+                sliceNode.SetOrientationToCoronal()
+            else:
+                print('ERROR: unknown orientation', button.text)
+
+        # rotate to volume plane
+        for volNode, view_name in zip(self.volNodes, ['Red', 'Yellow', 'Green']):
+            view = slicer.app.layoutManager().sliceWidget(view_name)
+            view.mrmlSliceNode().RotateToVolumePlane(volNode)
+        
 
     def onSelectDataButtonPressed(self):
         file_dialog = qt.QFileDialog(None, 'Select Data Folders')

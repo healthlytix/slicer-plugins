@@ -136,7 +136,7 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
         self.dataFolders = None
 
         # TEMP DEBUG
-        self.image_label_dict = OrderedDict([('test-data', (['/Users/brian/apps/slicer-plugins/test-data/T1-postcontrast.nii', '/Users/brian/apps/slicer-plugins/test-data/T2.nii', '/Users/brian/apps/slicer-plugins/test-data/FLAIR.nii', '/Users/brian/apps/slicer-plugins/test-data/T1-precontrast.nii'], '/Users/brian/apps/slicer-plugins/test-data/tumor-seg.nii'))])
+        self.image_label_dict = OrderedDict([('test-data', (OrderedDict([('T1-post', '/Users/brian/apps/slicer-plugins/test-data/T1-postcontrast.nii'), ('T2', '/Users/brian/apps/slicer-plugins/test-data/T2.nii'), ('FLAIR', '/Users/brian/apps/slicer-plugins/test-data/FLAIR.nii'), ('T1-pre', '/Users/brian/apps/slicer-plugins/test-data/T1-precontrast.nii')]), '/Users/brian/apps/slicer-plugins/test-data/tumor-seg.nii'))])
         self.updateWidgets()
 
 
@@ -182,6 +182,7 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
                     self.image_label_dict[folder_name] = im_fns, label_fn
                 else:
                     print('WARNING: Skipping '+data_folder+' because it is missing (or contains multiple) required input images')
+            print(self.image_label_dict)
             self.updateWidgets()
 
 
@@ -191,9 +192,12 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
         has_required_ims = all(len(ims)==1 for ims in folder_ims)
         has_label = len(glob(os.path.join(data_folder, self.config['labelFilenamePattern']))) == 1
         if has_required_ims and has_label:
-            im_fns = [ims[0] for ims in folder_ims]
+            imageDisplayNames = self.config['imageFilenamePatterns'].keys()
+            im_fns_dict = OrderedDict()
+            for ims, displayName in zip(folder_ims, imageDisplayNames):
+                im_fns_dict[displayName] = ims[0]
             label_fn = glob(os.path.join(data_folder, self.config['labelFilenamePattern']))[0]
-            return im_fns, label_fn
+            return im_fns_dict, label_fn
         else:
             return None, None
 
@@ -263,7 +267,7 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
 
         # select the filenames for this case
         try:
-            im_fns, label_fn = self.image_label_dict[text]
+            im_fns_dict, label_fn = self.image_label_dict[text]
         except KeyError:
             print('Could not find %s among selected images' % text)
             return
@@ -284,7 +288,7 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
                 sliceNode.SetOrientationToCoronal()
 
         # create vol nodes
-        self.loadVolumesFromFiles(im_fns)
+        self.loadVolumesFromFiles(im_fns_dict.values())
 
         # create segmentation
         self.createSegmentationFromFile(label_fn)

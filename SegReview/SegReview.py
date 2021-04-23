@@ -83,12 +83,16 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
         dataFormLayout.addRow('Orientation:', selectViewLayout)
 
         # Combobox for red/green/yellow slice views
-        self.redViewImage = qt.QComboBox()
-        dataFormLayout.addRow('Red View Image:', self.redViewImage)
-        self.greenViewImage = qt.QComboBox()
-        dataFormLayout.addRow('Green View Image:', self.greenViewImage)
-        self.yellowViewImage = qt.QComboBox()
-        dataFormLayout.addRow('Yellow View Image:', self.yellowViewImage)
+        imageNames = list(self.config['imageFilenamePatterns'].keys())
+        self.redViewCombobox = qt.QComboBox()
+        self.redViewCombobox.addItems(imageNames)
+        dataFormLayout.addRow('Red View Image:', self.redViewCombobox)
+        self.greenViewCombobox = qt.QComboBox()
+        self.greenViewCombobox.addItems(imageNames)
+        dataFormLayout.addRow('Green View Image:', self.greenViewCombobox)
+        self.yellowViewCombobox = qt.QComboBox()
+        self.yellowViewCombobox.addItems(imageNames)
+        dataFormLayout.addRow('Yellow View Image:', self.yellowViewCombobox)
 
         
         # #### Segmentation Area ####
@@ -172,17 +176,26 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
             data_folders = file_dialog.selectedFiles()
             self.image_label_dict = OrderedDict()
             for data_folder in data_folders:
-                folder_ims = [glob(os.path.join(data_folder, im_fn)) for im_fn in self.config['imageFilenamePatterns']]
-                has_required_ims = all(len(ims)==1 for ims in folder_ims)
-                has_label = len(glob(os.path.join(data_folder, self.config['labelFilenamePattern']))) == 1
-                if has_required_ims and has_label:
+                im_fns, label_fn = self.findImageFilesInFolder(data_folder)
+                if im_fns and label_fn:
                     folder_name = os.path.basename(data_folder)
-                    im_fns = [ims[0] for ims in folder_ims]
-                    label_fn = glob(os.path.join(data_folder, self.config['labelFilenamePattern']))[0]
                     self.image_label_dict[folder_name] = im_fns, label_fn
                 else:
                     print('WARNING: Skipping '+data_folder+' because it is missing (or contains multiple) required input images')
             self.updateWidgets()
+
+
+    def findImageFilesInFolder(self, data_folder):
+        imageFilenamePatterns = self.config['imageFilenamePatterns'].values()
+        folder_ims = [glob(os.path.join(data_folder, im_fn)) for im_fn in imageFilenamePatterns]
+        has_required_ims = all(len(ims)==1 for ims in folder_ims)
+        has_label = len(glob(os.path.join(data_folder, self.config['labelFilenamePattern']))) == 1
+        if has_required_ims and has_label:
+            im_fns = [ims[0] for ims in folder_ims]
+            label_fn = glob(os.path.join(data_folder, self.config['labelFilenamePattern']))[0]
+            return im_fns, label_fn
+        else:
+            return None, None
 
 
     def updateWidgets(self):
@@ -258,14 +271,18 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
 
         # remove existing nodes (if any)
         self.clearNodes()
-        
-        # TODO: if there's not label_fn, create empty seg
-
-        # make all slice views axial before loading volumes
+                
+        # set the correct orientation
         sliceNodes = slicer.util.getNodesByClass('vtkMRMLSliceNode')
+        selectedOrientation = self.viewButtonGroup.checkedButton().text
         for sliceNode in sliceNodes:
-            sliceNode.SetOrientationToAxial()
-        
+            if selectedOrientation == 'axial':
+                sliceNode.SetOrientationToAxial()
+            elif selectedOrientation == 'sagittal':
+                sliceNode.SetOrientationToSagittal()
+            elif selectedOrientation == 'coronal':
+                sliceNode.SetOrientationToCoronal()
+
         # create vol nodes
         self.loadVolumesFromFiles(im_fns)
 
@@ -273,13 +290,26 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
         self.createSegmentationFromFile(label_fn)
 
         # configure views
-        for volNode, view_name in zip(self.volNodes.values(), ['Red', 'Yellow', 'Green']):
-            view = slicer.app.layoutManager().sliceWidget(view_name)
-            view.sliceLogic().GetSliceCompositeNode().SetBackgroundVolumeID(volNode.GetID())
-            view.sliceLogic().GetSliceCompositeNode().SetLinkedControl(True)
-            view.mrmlSliceNode().RotateToVolumePlane(volNode)
-            view.sliceController().setSliceVisible(True)  # show in 3d view
+        for (volName, volNode), color in zip(self.volNodes.items(), ['Red', 'Yellow', 'Green']):
+            self.setSliceViewVolume(color, volName, volNode)
                 
+
+    def setSliceViewVolume(self, color, volName, volNode):
+        """Show the given volume in the 'color' slice view"""
+        view = slicer.app.layoutManager().sliceWidget(color)
+        view.sliceLogic().GetSliceCompositeNode().SetBackgroundVolumeID(volNode.GetID())
+        view.sliceLogic().GetSliceCompositeNode().SetLinkedControl(True)
+        view.mrmlSliceNode().RotateToVolumePlane(volNode)
+        view.sliceController().setSliceVisible(True)  # show in 3d view
+        
+        ind = self.redViewCombobox.findData(volName)
+        if color == 'Red':
+            self.redViewCombobox.setCurrentIndex(ind)
+        elif color == 'Yellow':
+            self.yellowViewCombobox.setCurrentIndex(ind)
+        elif color == 'Green':
+            self.greenViewCombobox.setCurrentIndex(ind)
+
 
     def loadVolumesFromFiles(self, filenames):
         self.volNodes = OrderedDict()

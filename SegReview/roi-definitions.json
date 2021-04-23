@@ -1,10 +1,10 @@
 {
-    "imageFilenamePatterns": [
-        "T1-postcontrast.nii",
-        "T2.nii",
-        "FLAIR.nii",
-        "T1-precontrast.nii"
-    ],
+    "imageFilenamePatterns": {
+        "T1-post": "T1-postcontrast.nii",
+        "T2": "T2.nii",
+        "FLAIR": "FLAIR.nii",
+        "T1-pre": "T1-precontrast.nii"
+    },
     "labelFilenamePattern": "tumor-seg.nii",
     "labelNames": {
         "1": "necrotic / non-enhancing core",

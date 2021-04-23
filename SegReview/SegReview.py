@@ -102,8 +102,7 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
 
         self.segCollapsibleButton = ctk.ctkCollapsibleButton()
         self.segCollapsibleButton.text = 'Segmentation'
-        # self.segCollapsibleButton.collapsed = False
-        self.segCollapsibleButton.collapsed = True  # TEMP DEBUG
+        self.segCollapsibleButton.collapsed = False
         self.layout.addWidget(self.segCollapsibleButton)
 
         # Layout within the dummy collapsible button
@@ -140,10 +139,6 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
         self.selected_image_ind = None
         self.active_label_fn = None
         self.dataFolders = None
-
-        # TEMP DEBUG
-        self.image_label_dict = OrderedDict([('test-data', (OrderedDict([('T1-post', '/Users/brian/apps/slicer-plugins/test-data/T1-postcontrast.nii'), ('T2', '/Users/brian/apps/slicer-plugins/test-data/T2.nii'), ('FLAIR', '/Users/brian/apps/slicer-plugins/test-data/FLAIR.nii'), ('T1-pre', '/Users/brian/apps/slicer-plugins/test-data/T1-precontrast.nii')]), '/Users/brian/apps/slicer-plugins/test-data/tumor-seg.nii'))])
-        self.updateWidgets()
 
 
     def onRedViewComboboxChanged(self, volName):

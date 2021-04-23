@@ -86,12 +86,15 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
         imageNames = list(self.config['imageFilenamePatterns'].keys())
         self.redViewCombobox = qt.QComboBox()
         self.redViewCombobox.addItems(imageNames)
+        self.redViewCombobox.setCurrentIndex(0)
         dataFormLayout.addRow('Red View Image:', self.redViewCombobox)
         self.greenViewCombobox = qt.QComboBox()
         self.greenViewCombobox.addItems(imageNames)
+        self.greenViewCombobox.setCurrentIndex(1)
         dataFormLayout.addRow('Green View Image:', self.greenViewCombobox)
         self.yellowViewCombobox = qt.QComboBox()
         self.yellowViewCombobox.addItems(imageNames)
+        self.yellowViewCombobox.setCurrentIndex(2)
         dataFormLayout.addRow('Yellow View Image:', self.yellowViewCombobox)
 
         
@@ -124,7 +127,10 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
         self.selectDataButton.clicked.connect(self.onSelectDataButtonPressed)
         self.previousImageButton.connect('clicked(bool)', self.previousImage)
         self.nextImageButton.connect('clicked(bool)', self.nextImage)
-        self.caseComboBox.connect('currentIndexChanged(const QString&)', self.onComboboxChanged)
+        self.caseComboBox.connect('currentIndexChanged(const QString&)', self.onCaseComboboxChanged)
+        self.redViewCombobox.connect('currentIndexChanged(const QString&)', self.onRedViewComboboxChanged)
+        self.greenViewCombobox.connect('currentIndexChanged(const QString&)', self.onGreenViewComboboxChanged)
+        self.yellowViewCombobox.connect('currentIndexChanged(const QString&)', self.onYellowViewComboboxChanged)
         self.viewButtonGroup.buttonClicked.connect(self.onViewOrientationChanged)
 
         ### Logic ###
@@ -138,6 +144,18 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
         # TEMP DEBUG
         self.image_label_dict = OrderedDict([('test-data', (OrderedDict([('T1-post', '/Users/brian/apps/slicer-plugins/test-data/T1-postcontrast.nii'), ('T2', '/Users/brian/apps/slicer-plugins/test-data/T2.nii'), ('FLAIR', '/Users/brian/apps/slicer-plugins/test-data/FLAIR.nii'), ('T1-pre', '/Users/brian/apps/slicer-plugins/test-data/T1-precontrast.nii')]), '/Users/brian/apps/slicer-plugins/test-data/tumor-seg.nii'))])
         self.updateWidgets()
+
+
+    def onRedViewComboboxChanged(self, volName):
+        self.setSliceViewVolume('Red', volName, self.volNodes[volName])
+
+
+    def onGreenViewComboboxChanged(self, volName):
+        self.setSliceViewVolume('Green', volName, self.volNodes[volName])
+
+
+    def onYellowViewComboboxChanged(self, volName):
+        self.setSliceViewVolume('Yellow', volName, self.volNodes[volName])
 
 
     def onViewOrientationChanged(self, button):
@@ -242,7 +260,7 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
         self.caseComboBox.setCurrentIndex(self.selected_image_ind)
 
 
-    def onComboboxChanged(self, text):
+    def onCaseComboboxChanged(self, text):
         """Load a new case when the user selects from the cases combobox
 
         This is the main function for loading images from disk, configuring the views, and creating
@@ -288,7 +306,7 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
                 sliceNode.SetOrientationToCoronal()
 
         # create vol nodes
-        self.loadVolumesFromFiles(im_fns_dict.values())
+        self.loadVolumesFromFiles(im_fns_dict)
 
         # create segmentation
         self.createSegmentationFromFile(label_fn)
@@ -306,25 +324,16 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
         view.mrmlSliceNode().RotateToVolumePlane(volNode)
         view.sliceController().setSliceVisible(True)  # show in 3d view
         
-        ind = self.redViewCombobox.findData(volName)
-        if color == 'Red':
-            self.redViewCombobox.setCurrentIndex(ind)
-        elif color == 'Yellow':
-            self.yellowViewCombobox.setCurrentIndex(ind)
-        elif color == 'Green':
-            self.greenViewCombobox.setCurrentIndex(ind)
 
-
-    def loadVolumesFromFiles(self, filenames):
+    def loadVolumesFromFiles(self, filename_dict):
         self.volNodes = OrderedDict()
-        for im_fn in filenames:
-            volNode = slicer.util.loadVolume(im_fn)
+        for display_name, filename in filename_dict.items():
+            volNode = slicer.util.loadVolume(filename)
             if volNode:
                 volNode.GetScalarVolumeDisplayNode().SetInterpolate(0)
-                base_im_fn = os.path.splitext(os.path.basename(im_fn))[0]
-                self.volNodes[base_im_fn] = volNode
+                self.volNodes[display_name] = volNode
             else:
-                print('WARNING: Failed to load volume ', im_fn)
+                print('WARNING: Failed to load volume ', filename)
         if len(self.volNodes) == 0:
             print('Failed to load any volumes ({filenames})!')
             return

@@ -4,9 +4,11 @@ The process of loading a segmentation from an image file, editing it in Slicer, 
 
 # Installation
 
-Clone this repo to your computer. In the Slicer menu, select `Edit > Application Setttings` and select `Modules` from the side pane. Next to `Additional Module Paths` are buttons to `Add` and `Remove` module paths. Click the `Add` button, and select the `BatchSegmentation` subfolder in this repo (NOT the repo root). You will be prompted to restart Slicer; do so. Once it has restarted, you should be able to select the `Batch Segmentation Editor` module from the `Modules` combobox.
+Clone this repo to your computer. In the Slicer menu, select `Edit > Application Setttings` and select `Modules` from the side pane. Next to `Additional Module Paths` are buttons to `Add` and `Remove` module paths. Click the `Add` button, and select the `BatchSegmentation` or `SegReview` subfolder in this repo (NOT the repo root). You will be prompted to restart Slicer; do so. Once it has restarted, you should be able to select the newly-installed module from the `Modules` combobox.
 
 # Usage
+
+## Batch Segmentation
 
 * Open the `Batch Segmentation Editor` module.
 * Click on the `Select Data Folders` button and select all of the folders that you want to work on. If this step is successful, the module will load the image names into the `Activate Folder` combobox, and will load the first image and segmentation.

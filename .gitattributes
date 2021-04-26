@@ -1,2 +1,5 @@
-Data/*.nii filter=lfs diff=lfs merge=lfs -text
-BatchSegmenter/Data/tumor-seg-missing-edema.nii filter=lfs diff=lfs merge=lfs -text
+test-data/T1-precontrast.nii filter=lfs diff=lfs merge=lfs -text
+test-data/T2.nii filter=lfs diff=lfs merge=lfs -text
+test-data/tumor-seg.nii filter=lfs diff=lfs merge=lfs -text
+test-data/FLAIR.nii filter=lfs diff=lfs merge=lfs -text
+test-data/T1-postcontrast.nii filter=lfs diff=lfs merge=lfs -text

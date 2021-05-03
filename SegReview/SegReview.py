@@ -288,7 +288,13 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
 
         # remove existing nodes (if any)
         self.clearNodes()
-                
+
+        # create vol nodes
+        self.loadVolumesFromFiles(im_fns_dict)
+
+        # create segmentation
+        self.createSegmentationFromFile(label_fn)
+
         # set the correct orientation
         sliceNodes = slicer.util.getNodesByClass('vtkMRMLSliceNode')
         selectedOrientation = self.viewButtonGroup.checkedButton().text
@@ -300,17 +306,10 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
             elif selectedOrientation == 'coronal':
                 sliceNode.SetOrientationToCoronal()
 
-        # create vol nodes
-        self.loadVolumesFromFiles(im_fns_dict)
-
-        # create segmentation
-        self.createSegmentationFromFile(label_fn)
-
         # configure views
         for (volName, volNode), color in zip(self.volNodes.items(), ['Red', 'Yellow', 'Green']):
             self.setSliceViewVolume(color, volName, volNode)
-                
-
+        
     def setSliceViewVolume(self, color, volName, volNode):
         """Show the given volume in the 'color' slice view"""
         view = slicer.app.layoutManager().sliceWidget(color)

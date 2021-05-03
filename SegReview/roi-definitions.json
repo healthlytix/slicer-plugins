@@ -1,19 +1,19 @@
 {
     "imageFilenamePatterns": {
-        "T1-post": "T1-postcontrast.nii",
-        "T2": "T2.nii",
-        "FLAIR": "FLAIR.nii",
-        "T1-pre": "T1-precontrast.nii"
+        "T1-post": "BraTS20_Training_???_t1ce.nii.gz",
+        "T2": "BraTS20_Training_???_t2.nii.gz",
+        "FLAIR": "BraTS20_Training_???_flair.nii.gz",
+        "T1-pre": "BraTS20_Training_???_t1.nii.gz"
     },
-    "labelFilenamePattern": "tumor-seg.nii",
+    "labelFilenamePattern": "BraTS20_Training_???_seg.nii.gz",
     "labelNames": {
         "1": "necrotic / non-enhancing core",
         "2": "peritumoral edema",
-        "3": "enhancing tumor"
+        "4": "enhancing tumor"
     },
     "labelColors": {
         "1": [255, 0, 0],
         "2": [0, 255, 0],
-        "3": [0, 0, 255]
+        "4": [0, 0, 255]
     }
 }

@@ -307,7 +307,13 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
                 sliceNode.SetOrientationToCoronal()
 
         # configure views
-        for (volName, volNode), color in zip(self.volNodes.items(), ['Red', 'Green', 'Yellow']):
+        volNames = [
+            self.redViewCombobox.currentText,
+            self.greenViewCombobox.currentText,
+            self.yellowViewCombobox.currentText,
+        ]
+        for volName, color in zip(volNames, ['Red', 'Green', 'Yellow']):
+            volNode = self.volNodes[volName]
             self.setSliceViewVolume(color, volName, volNode)
         
 
@@ -322,13 +328,7 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
 
     def loadVolumesFromFiles(self, filename_dict):
         self.volNodes = OrderedDict()
-        display_names = [
-            self.redViewCombobox.currentText,
-            self.greenViewCombobox.currentText,
-            self.yellowViewCombobox.currentText,
-        ]
-        for display_name in display_names:
-            filename = filename_dict[display_name]
+        for display_name, filename in filename_dict.items():
             volNode = slicer.util.loadVolume(filename)
             if volNode:
                 volNode.GetScalarVolumeDisplayNode().SetInterpolate(0)

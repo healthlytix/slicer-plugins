@@ -1,9 +1,9 @@
 {
     "imageFilenamePatterns": {
         "T1-post": "BraTS20_Training_???_t1ce.nii.gz",
-        "T2": "BraTS20_Training_???_t2.nii.gz",
+        "T1-pre": "BraTS20_Training_???_t1.nii.gz",
         "FLAIR": "BraTS20_Training_???_flair.nii.gz",
-        "T1-pre": "BraTS20_Training_???_t1.nii.gz"
+        "T2": "BraTS20_Training_???_t2.nii.gz"
     },
     "labelFilenamePattern": "BraTS20_Training_???_seg.nii.gz",
     "labelNames": {

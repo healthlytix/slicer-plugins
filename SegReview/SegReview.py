@@ -195,7 +195,7 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
                     self.image_label_dict[folder_name] = im_fns, label_fn
                 else:
                     print('WARNING: Skipping '+data_folder+' because it is missing (or contains multiple) required input images')
-            print(self.image_label_dict)
+            print('image_label_dict =', self.image_label_dict)
             self.updateWidgets()
 
 
@@ -307,9 +307,16 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
                 sliceNode.SetOrientationToCoronal()
 
         # configure views
-        for (volName, volNode), color in zip(self.volNodes.items(), ['Red', 'Yellow', 'Green']):
+        volNames = [
+            self.redViewCombobox.currentText,
+            self.greenViewCombobox.currentText,
+            self.yellowViewCombobox.currentText,
+        ]
+        for volName, color in zip(volNames, ['Red', 'Green', 'Yellow']):
+            volNode = self.volNodes[volName]
             self.setSliceViewVolume(color, volName, volNode)
         
+
     def setSliceViewVolume(self, color, volName, volNode):
         """Show the given volume in the 'color' slice view"""
         view = slicer.app.layoutManager().sliceWidget(color)

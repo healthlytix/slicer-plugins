@@ -217,11 +217,6 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.clearNodes()
         
         # TODO: if there's not label_fn, create empty seg
-
-        # make all slice views axial before loading volumes
-        sliceNodes = slicer.util.getNodesByClass('vtkMRMLSliceNode')
-        for sliceNode in sliceNodes:
-            sliceNode.SetOrientationToAxial()
         
         # create vol nodes
         self.loadVolumesFromFiles(im_fns)
@@ -237,6 +232,12 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             view.mrmlSliceNode().RotateToVolumePlane(volNode)
             view.sliceController().setSliceVisible(True)  # show in 3d view
                 
+        # make all slice views axial after loading volumes
+        sliceNodes = slicer.util.getNodesByClass('vtkMRMLSliceNode')
+        for sliceNode in sliceNodes:
+            sliceNode.SetOrientationToAxial()
+            
+
     def loadVolumesFromFiles(self, filenames):
         self.volNodes = []
         for im_fn in filenames:

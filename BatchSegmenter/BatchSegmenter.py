@@ -230,8 +230,9 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
             view.sliceLogic().GetSliceCompositeNode().SetBackgroundVolumeID(volNode.GetID())
             view.sliceLogic().GetSliceCompositeNode().SetLinkedControl(True)
             view.mrmlSliceNode().RotateToVolumePlane(volNode)
+            volNode.GetScalarVolumeDisplayNode().SetInterpolate(0)
             view.sliceController().setSliceVisible(True)  # show in 3d view
-                
+            
         # make all slice views axial after loading volumes
         sliceNodes = slicer.util.getNodesByClass('vtkMRMLSliceNode')
         for sliceNode in sliceNodes:
@@ -243,7 +244,6 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         for im_fn in filenames:
             volNode = slicer.util.loadVolume(im_fn)
             if volNode:
-                volNode.GetScalarVolumeDisplayNode().SetInterpolate(0)
                 self.volNodes.append(volNode)
             else:
                 print('WARNING: Failed to load volume ', im_fn)

@@ -87,7 +87,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         self.segEditorWidget.enabled = True
         self.segEditorWidget.setSwitchToSegmentationsButtonVisible(False)
         self.segEditorWidget.setSegmentationNodeSelectorVisible(False)
-        self.segEditorWidget.setMasterVolumeNodeSelectorVisible(False)
+        self.segEditorWidget.setMasterVolumeNodeSelectorVisible(True)
         self.segEditorWidget.setReadOnly(False)
         segFormLayout.addRow(self.segEditorWidget)
 
@@ -236,7 +236,7 @@ class BatchSegmenterWidget(ScriptedLoadableModuleWidget):
         sliceNodes = slicer.util.getNodesByClass('vtkMRMLSliceNode')
         for sliceNode in sliceNodes:
             sliceNode.SetOrientationToAxial()
-            
+
 
     def loadVolumesFromFiles(self, filenames):
         self.volNodes = []

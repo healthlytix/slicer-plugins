@@ -1,11 +1,11 @@
 {
     "imageFilenamePatterns": [
-        "BraTS20_Training_???_t1ce.nii.gz",
-        "BraTS20_Training_???_t2.nii.gz",
-        "BraTS20_Training_???_flair.nii.gz",
-        "BraTS20_Training_???_t1.nii.gz"
+        "t1ce.nii.gz",
+        "t2.nii.gz",
+        "flair.nii.gz",
+        "t1.nii.gz"
     ],
-    "labelFilenamePattern": "BraTS20_Training_???_initial_seg.nii.gz",
+    "labelFilenamePattern": "tumor-seg.nii.gz",
     
     "labelNames": {
         "1": "necrotic / non-enhancing core",

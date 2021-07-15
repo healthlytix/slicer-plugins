@@ -135,7 +135,7 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         self.viewButtonGroup.buttonClicked.connect(self.onViewOrientationChanged)
 
         ### Logic ###
-        self.imagePathsDf = None
+        self.imagePathsDf = pd.DataFrame()
         self.segmentationNode = None
         self.volNodes = OrderedDict()
         self.selected_image_ind = None
@@ -240,6 +240,7 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
             
         # put everything into a DataFrame
         df = pd.DataFrame(all_paths)
+        df = df.set_index('case') 
 
         # drop any rows/cases that are missing MRIs
         im_names = self.config['imageFilenamePatterns'].keys()
@@ -268,16 +269,17 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
 
     def updateWidgets(self):
         """Load selected valid case names into the widget"""
+
         # select data button
-        if len(self.image_label_dict) > 1:
-            self.selectDataButton.setText(str(len(self.image_label_dict))+' cases')
+        if len(self.imagePathsDf) > 1:
+            self.selectDataButton.setText(str(len(self.imagePathsDf))+' cases')
         elif len(self.image_label_dict) == 1:
-            self.selectDataButton.setText(os.path.basename(list(self.image_label_dict.keys())[0]))
+            self.selectDataButton.setText(self.imagePathsDf.index[0])
         
         # case combobox
         self.caseComboBox.clear()
-        if self.image_label_dict:
-            case_names = list(self.image_label_dict.keys())
+        if len(self.imagePathsDf) > 0:
+            case_names = list(self.imagePathsDf.index)
             self.caseComboBox.addItems(case_names)  # load names into combobox
             self.caseComboBox.enabled = True
             self.nextImageButton.enabled = True
@@ -294,15 +296,15 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
 
     def nextImage(self):
         self.selected_image_ind += 1
-        if self.selected_image_ind > len(self.image_label_dict) - 1:
-            self.selected_image_ind -= len(self.image_label_dict)
+        if self.selected_image_ind > len(self.imagePathsDf) - 1:
+            self.selected_image_ind -= len(self.imagePathsDf)
         self.caseComboBox.setCurrentIndex(self.selected_image_ind)
 
 
     def previousImage(self):
         self.selected_image_ind -= 1
         if self.selected_image_ind < 0:
-            self.selected_image_ind += len(self.image_label_dict)
+            self.selected_image_ind += len(self.imagePathsDf)
         self.caseComboBox.setCurrentIndex(self.selected_image_ind)
 
 
@@ -321,51 +323,52 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
                 label file
         """
         
-        if not self.image_label_dict:
+        if len(self.imagePathsDf) == 0:
             return
 
         try:
-            self.selected_image_ind = list(self.image_label_dict.keys()).index(text)
-        except ValueError:
-            return
-
-        # select the filenames for this case
-        try:
-            im_fns_dict, label_fn = self.image_label_dict[text]
+            self.selected_image_ind = self.imagePathsDf.index.get_loc(text)
         except KeyError:
-            print('Could not find %s among selected images' % text)
-            return
-        self.active_label_fn = label_fn
+            raise ValueError('Tried to load non-existent case '+text)
 
-        # remove existing nodes (if any)
-        self.clearNodes()
+        # # select the filenames for this case
+        # try:
+        #     im_fns_dict = self.imagePathsDf
+        #     seg_fns_dict = self.imagePathsDf
+        # except KeyError:
+        #     print('Could not find %s among selected images' % text)
+        #     return
+        # self.active_label_fn = label_fn
 
-        # create vol nodes
-        self.loadVolumesFromFiles(im_fns_dict)
+        # # remove existing nodes (if any)
+        # self.clearNodes()
 
-        # create segmentation
-        self.createSegmentationFromFile(label_fn)
+        # # create vol nodes
+        # self.loadVolumesFromFiles(im_fns_dict)
 
-        # set the correct orientation
-        sliceNodes = slicer.util.getNodesByClass('vtkMRMLSliceNode')
-        selectedOrientation = self.viewButtonGroup.checkedButton().text
-        for sliceNode in sliceNodes:
-            if selectedOrientation == 'axial':
-                sliceNode.SetOrientationToAxial()
-            elif selectedOrientation == 'sagittal':
-                sliceNode.SetOrientationToSagittal()
-            elif selectedOrientation == 'coronal':
-                sliceNode.SetOrientationToCoronal()
+        # # create segmentation
+        # self.createSegmentationFromFile(label_fn)
 
-        # configure views
-        volNames = [
-            self.redViewCombobox.currentText,
-            self.greenViewCombobox.currentText,
-            self.yellowViewCombobox.currentText,
-        ]
-        for volName, color in zip(volNames, ['Red', 'Green', 'Yellow']):
-            volNode = self.volNodes[volName]
-            self.setSliceViewVolume(color, volName, volNode)
+        # # set the correct orientation
+        # sliceNodes = slicer.util.getNodesByClass('vtkMRMLSliceNode')
+        # selectedOrientation = self.viewButtonGroup.checkedButton().text
+        # for sliceNode in sliceNodes:
+        #     if selectedOrientation == 'axial':
+        #         sliceNode.SetOrientationToAxial()
+        #     elif selectedOrientation == 'sagittal':
+        #         sliceNode.SetOrientationToSagittal()
+        #     elif selectedOrientation == 'coronal':
+        #         sliceNode.SetOrientationToCoronal()
+
+        # # configure views
+        # volNames = [
+        #     self.redViewCombobox.currentText,
+        #     self.greenViewCombobox.currentText,
+        #     self.yellowViewCombobox.currentText,
+        # ]
+        # for volName, color in zip(volNames, ['Red', 'Green', 'Yellow']):
+        #     volNode = self.volNodes[volName]
+        #     self.setSliceViewVolume(color, volName, volNode)
         
 
     def setSliceViewVolume(self, color, volName, volNode):

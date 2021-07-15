@@ -8,6 +8,8 @@ import numpy as np
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import logging
+slicer.util.pip_install('pandas')
+import pandas as pd
 
 
 class CompareSegs(ScriptedLoadableModule):
@@ -29,8 +31,8 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         ScriptedLoadableModuleWidget.setup(self)
         
         # Read config
-        config_fn = os.path.join(os.path.dirname(__file__), 'roi-definitions.json')
-        print('Loading config from ', config_fn)
+        config_fn = os.path.join(os.path.dirname(__file__), 'config.json')
+        print('Loading CompareSegs config from ', config_fn)
         with open(config_fn) as f:
             self.config = json.load(f)
         self.labelNameToLabelVal = {val: key for key, val in self.config['labelNames'].items()}
@@ -133,7 +135,7 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         self.viewButtonGroup.buttonClicked.connect(self.onViewOrientationChanged)
 
         ### Logic ###
-        self.image_label_dict = OrderedDict()
+        self.imagePathsDf = None
         self.segmentationNode = None
         self.volNodes = OrderedDict()
         self.selected_image_ind = None
@@ -179,24 +181,73 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         file_dialog.setOption(qt.QFileDialog.DontUseNativeDialog, True)
         file_dialog.setOption(qt.QFileDialog.ShowDirsOnly, True)
         file_view = file_dialog.findChild(qt.QListView, 'listView')
-        # make it possible to select multiple directories:
+        # make it possible to select multiple directories
         if file_view:
             file_view.setSelectionMode(qt.QAbstractItemView.MultiSelection)
         f_tree_view = file_dialog.findChild(qt.QTreeView)
         if f_tree_view:
             f_tree_view.setSelectionMode(qt.QAbstractItemView.MultiSelection)
         if file_dialog.exec_():
-            data_folders = file_dialog.selectedFiles()
-            self.image_label_dict = OrderedDict()
-            for data_folder in data_folders:
-                im_fns, label_fn = self.findImageFilesInFolder(data_folder)
-                if im_fns and label_fn:
-                    folder_name = os.path.basename(data_folder)
-                    self.image_label_dict[folder_name] = im_fns, label_fn
-                else:
-                    print('WARNING: Skipping '+data_folder+' because it is missing (or contains multiple) required input images')
-            print('image_label_dict =', self.image_label_dict)
+            labeler_folders = file_dialog.selectedFiles()
+            self.imagePathsDf = self.loadImagePathsDataFrame(labeler_folders)
+            print(self.imagePathsDf)
             self.updateWidgets()
+
+
+    def loadImagePathsDataFrame(self, labeler_folders):
+        """Make a DataFrame: rows=cases, cols=ims, values=paths"""
+
+        # Create a set of all case folders (underneath `labeler_folders`)
+        labeler_names = [os.path.basename(d) for d in labeler_folders]
+        case_names = set()
+        for labeler_folder in labeler_folders:
+            labeler_cases = [os.path.basename(d) for d in glob(os.path.join(labeler_folder, '*')) if os.path.isdir(d)]
+            case_names.update(labeler_cases)
+
+        # Load image and seg paths for each case
+        all_paths = []
+        for case_name in sorted(case_names):
+            case_paths = OrderedDict()
+            case_paths['case'] = case_name
+
+            # images (from any labeler_folder)
+            for im_name, im_pattern in self.config['imageFilenamePatterns'].items():
+                for labeler_folder in labeler_folders:
+                    case_im_pattern = os.path.join(labeler_folder, case_name, im_pattern)
+                    matching_paths = glob(case_im_pattern)
+                    if len(matching_paths) == 1:
+                        case_paths[im_name] = matching_paths[0]
+                        break
+                    elif len(matching_paths) == 0:
+                        print('No images like ', case_im_pattern)
+                    else:
+                        print('Multiple images match ', case_im_pattern)
+            
+            # segs (from every labeler_folder)
+            for labeler_folder in labeler_folders:
+                seg_pattern = os.path.join(labeler_folder, case_name, self.config['segFilenamePattern'])
+                matching_paths = glob(seg_pattern)
+                if len(matching_paths) == 1:
+                    labeler_name = os.path.basename(labeler_folder)
+                    col_name = labeler_name + '.seg'
+                    case_paths[col_name] = matching_paths[0]
+                elif len(matching_paths) == 0:
+                    print('No images like ', seg_pattern)
+                else:
+                    print('Multiple images match ', seg_pattern)
+
+            all_paths.append(case_paths)
+            
+        # put everything into a DataFrame
+        df = pd.DataFrame(all_paths)
+
+        # drop any rows/cases that are missing MRIs
+        im_names = self.config['imageFilenamePatterns'].keys()
+        df[~df[im_names].isna().any(1)]
+        seg_cols = [col for col in df.columns if col.endswith('seg')]
+        print('Loaded '+str(len(df))+' cases from '+str(len(seg_cols))+' labelers')
+        
+        return df
 
 
     def findImageFilesInFolder(self, data_folder):

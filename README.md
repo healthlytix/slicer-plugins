@@ -15,6 +15,14 @@ Clone this repo to your computer. In the Slicer menu, select `Edit > Application
 * Switch to the `Segment Editor` module. From the `Master Volume` select the your reference image (it should be the only choice) and edit the segmentation as you see fit. Instructions for use [can be found here](https://slicer.readthedocs.io/en/latest/user_guide/module_segmenteditor.html). Common keyboard shortcuts: `1` to select paintbrush, `3` to select eraser, `space` to toggle between the 2 most recently used tools. Once the focus is in the slicer viewer, you can toggle the segmentation visibility with `g`.
 * When you are done with the segmentation, switch bach to `Batch Segmentation` and select the next image you'd like to work on. The segmentation you were just working on is automatically saved.
 
+## SegReview
+
+This is quite similar to BatchSegmentation, but the segmentations are not editable.
+
+## CompareSegs
+
+Compare multiple segmentations against one another, one ROI at a time.
+
 # Development
 
 I followed [the instructions here](https://na-mic.org/wiki/2013_Project_Week_Breakout_Session:Slicer4Python) to create an extension and module from a template in [the Slicer repo](https://github.com/Slicer/Slicer).

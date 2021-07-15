@@ -5,7 +5,7 @@
         "FLAIR": "BraTS20_Training_???_flair.nii.gz",
         "T2": "BraTS20_Training_???_t2.nii.gz"
     },
-    "labelFilenamePattern": "BraTS20_Training_???_initial_seg.nii.gz",
+    "segFilenamePattern": "BraTS20_Training_???_initial_seg.nii.gz",
     "labelNames": {
         "1": "necrotic / non-enhancing core",
         "2": "peritumoral edema",

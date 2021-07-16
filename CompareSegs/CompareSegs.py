@@ -308,14 +308,14 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         self.caseComboBox.setCurrentIndex(self.selected_image_ind)
 
 
-    def onCaseComboboxChanged(self, text):
+    def onCaseComboboxChanged(self, case_name):
         """Load a new case when the user selects from the cases combobox
 
         This is the main function for loading images from disk, configuring the views, and creating
         a segmentation with the correct display names/colors.
 
         Arg:
-            text (str): the name of the case (which was derived from the directory name). Should be 
+            case_name (str): the name of the case (which was derived from the directory name). Should be 
                 a key in ``self.image_label_dict``
 
         Raises:
@@ -327,48 +327,49 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
             return
 
         try:
-            self.selected_image_ind = self.imagePathsDf.index.get_loc(text)
+            self.selected_image_ind = self.imagePathsDf.index.get_loc(case_name)
         except KeyError:
-            raise ValueError('Tried to load non-existent case '+text)
+            raise ValueError('Tried to load non-existent case '+case_name)
 
-        # # select the filenames for this case
-        # try:
-        #     im_fns_dict = self.imagePathsDf
-        #     seg_fns_dict = self.imagePathsDf
-        # except KeyError:
-        #     print('Could not find %s among selected images' % text)
-        #     return
+        # select the filenames for this case
+        try:
+            row_dict = self.imagePathsDf.to_dict('index')[case_name]
+            im_fns_dict = {name: path for name, path in row_dict.items() if name in self.config['imageFilenamePatterns']}
+            seg_fns_dict = {name.replace('.seg', ''): path for name, path in row_dict.items() if name.endswith('seg')}
+        except KeyError:
+            print('Could not find '+case_name+' among selected images')
+            return
         # self.active_label_fn = label_fn
 
-        # # remove existing nodes (if any)
-        # self.clearNodes()
+        # remove existing nodes (if any)
+        self.clearNodes()
 
-        # # create vol nodes
-        # self.loadVolumesFromFiles(im_fns_dict)
+        # create vol nodes
+        self.loadVolumesFromFiles(im_fns_dict)
 
         # # create segmentation
         # self.createSegmentationFromFile(label_fn)
 
-        # # set the correct orientation
-        # sliceNodes = slicer.util.getNodesByClass('vtkMRMLSliceNode')
-        # selectedOrientation = self.viewButtonGroup.checkedButton().text
-        # for sliceNode in sliceNodes:
-        #     if selectedOrientation == 'axial':
-        #         sliceNode.SetOrientationToAxial()
-        #     elif selectedOrientation == 'sagittal':
-        #         sliceNode.SetOrientationToSagittal()
-        #     elif selectedOrientation == 'coronal':
-        #         sliceNode.SetOrientationToCoronal()
+        # set the correct orientation
+        sliceNodes = slicer.util.getNodesByClass('vtkMRMLSliceNode')
+        selectedOrientation = self.viewButtonGroup.checkedButton().text
+        for sliceNode in sliceNodes:
+            if selectedOrientation == 'axial':
+                sliceNode.SetOrientationToAxial()
+            elif selectedOrientation == 'sagittal':
+                sliceNode.SetOrientationToSagittal()
+            elif selectedOrientation == 'coronal':
+                sliceNode.SetOrientationToCoronal()
 
-        # # configure views
-        # volNames = [
-        #     self.redViewCombobox.currentText,
-        #     self.greenViewCombobox.currentText,
-        #     self.yellowViewCombobox.currentText,
-        # ]
-        # for volName, color in zip(volNames, ['Red', 'Green', 'Yellow']):
-        #     volNode = self.volNodes[volName]
-        #     self.setSliceViewVolume(color, volName, volNode)
+        # configure views
+        volNames = [
+            self.redViewCombobox.currentText,
+            self.greenViewCombobox.currentText,
+            self.yellowViewCombobox.currentText,
+        ]
+        for volName, color in zip(volNames, ['Red', 'Green', 'Yellow']):
+            volNode = self.volNodes[volName]
+            self.setSliceViewVolume(color, volName, volNode)
         
 
     def setSliceViewVolume(self, color, volName, volNode):

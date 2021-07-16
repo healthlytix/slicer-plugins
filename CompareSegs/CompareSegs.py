@@ -352,7 +352,6 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         except KeyError:
             print('Could not find '+case_name+' among selected images')
             return
-        # self.active_label_fn = label_fn
 
         # remove existing nodes (if any)
         self.clearNodes()
@@ -360,8 +359,8 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         # create vol nodes
         self.loadVolumesFromFiles(im_fns_dict)
 
-        # # create segmentation
-        # self.createSegmentationFromFile(label_fn)
+        # create segmentation
+        self.createLabelImagesFromFile(seg_fns_dict)
 
         # set the correct orientation
         sliceNodes = slicer.util.getNodesByClass('vtkMRMLSliceNode')
@@ -408,52 +407,59 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
             return
 
 
-    def createSegmentationFromFile(self, label_fn):
-        print('INFO: CompareSegs.createSegmentationFromFile invoked', label_fn)
+    def createLabelImagesFromFile(self, seg_fns_dict):
+        print('INFO: CompareSegs.createSegmentationFromFile invoked', seg_fns_dict)
 
-        # create label node as a labelVolume
-        labelmapNode = slicer.util.loadLabelVolume(label_fn)
-        if not labelmapNode:
-            print('Failed to load label volume ', label_fn)
-            return
+        # create segs as a labelVolume's
+        self.labelmapNodes = {}
+        for labeler_name, seg_fn in seg_fns_dict.items():
+            if not seg_fn:
+                continue
+            labelmapNode = slicer.util.loadLabelVolume(seg_fn)
+            node_name = os.path.basename(seg_fn).split('.')[0]+'_'+labeler_name
+            labelmapNode.SetName(node_name)
+            if not labelmapNode:
+                print('Failed to load label volume ', seg_fn)
+                continue
+            self.labelmapNodes[labeler_name] = labelmapNode
 
-        # create segmentation node from labelVolume
-        self.segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode', 'Tumor Segmentation')
-        self.segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(list(self.volNodes.values())[0])
-        self.segmentationNode.CreateDefaultDisplayNodes()
-        slicer.mrmlScene.AddNode(self.segmentationNode)
-        slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmapNode, self.segmentationNode)
-        self.segEditorWidget.setSegmentationNode(self.segmentationNode)
-        slicer.mrmlScene.RemoveNode(labelmapNode)
+        # # create segmentation node from labelVolume
+        # self.segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode', 'Tumor Segmentation')
+        # self.segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(list(self.volNodes.values())[0])
+        # self.segmentationNode.CreateDefaultDisplayNodes()
+        # slicer.mrmlScene.AddNode(self.segmentationNode)
+        # slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmapNode, self.segmentationNode)
+        # self.segEditorWidget.setSegmentationNode(self.segmentationNode)
+        # slicer.mrmlScene.RemoveNode(labelmapNode)
 
-        # figure out segment labels
-        segmentation = self.segmentationNode.GetSegmentation()
-        integerLabels = np.unique(slicer.util.arrayFromVolume(labelmapNode))
-        integerLabels = np.delete(integerLabels, np.argwhere(integerLabels==0))  # remove background label
-        segments = [segmentation.GetNthSegment(segInd) for segInd in range(segmentation.GetNumberOfSegments())]
-        labelToSegment = {str(label): segment for label, segment in zip(integerLabels, segments)}
+        # # figure out segment labels
+        # segmentation = self.segmentationNode.GetSegmentation()
+        # integerLabels = np.unique(slicer.util.arrayFromVolume(labelmapNode))
+        # integerLabels = np.delete(integerLabels, np.argwhere(integerLabels==0))  # remove background label
+        # segments = [segmentation.GetNthSegment(segInd) for segInd in range(segmentation.GetNumberOfSegments())]
+        # labelToSegment = {str(label): segment for label, segment in zip(integerLabels, segments)}
         
-        # verify that labels in label_fn match those in the config
-        existingLabelsAreInConfig = [label in self.config['labelNames'] for label in labelToSegment]
-        if not all(existingLabelsAreInConfig):
-            raise ValueError('Some of the integer labels in '+label_fn+' ('+str(labelToSegment.keys())+') '+' are missing from config ('+str(self.config['labelNames'].keys())+')')
+        # # verify that labels in label_fn match those in the config
+        # existingLabelsAreInConfig = [label in self.config['labelNames'] for label in labelToSegment]
+        # if not all(existingLabelsAreInConfig):
+        #     raise ValueError('Some of the integer labels in '+label_fn+' ('+str(labelToSegment.keys())+') '+' are missing from config ('+str(self.config['labelNames'].keys())+')')
 
-        # set colors and names for segments
-        for labelVal, labelName in self.config['labelNames'].items():
-            color = np.array(self.config['labelColors'][labelVal], float) / 255
-            if labelVal in labelToSegment:
-                try:
-                    segment = labelToSegment[labelVal]
-                    labelName = self.config['labelNames'][labelVal]
-                    segment.SetColor(color)
-                    segment.SetName(labelName)
-                    print('INFO: Adding segment for label ', labelVal, ' as ', labelName)
-                except KeyError:
-                    print('ERROR: problem getting label name or color for segment ', labelVal)
-                    continue
-            else:  # label is missing from labelmap, create empty segment
-                print('INFO: Adding empty segment for class', labelName)
-                segmentation.AddEmptySegment(str(labelVal), labelName, color)
+        # # set colors and names for segments
+        # for labelVal, labelName in self.config['labelNames'].items():
+        #     color = np.array(self.config['labelColors'][labelVal], float) / 255
+        #     if labelVal in labelToSegment:
+        #         try:
+        #             segment = labelToSegment[labelVal]
+        #             labelName = self.config['labelNames'][labelVal]
+        #             segment.SetColor(color)
+        #             segment.SetName(labelName)
+        #             print('INFO: Adding segment for label ', labelVal, ' as ', labelName)
+        #         except KeyError:
+        #             print('ERROR: problem getting label name or color for segment ', labelVal)
+        #             continue
+        #     else:  # label is missing from labelmap, create empty segment
+        #         print('INFO: Adding empty segment for class', labelName)
+        #         segmentation.AddEmptySegment(str(labelVal), labelName, color)
                 
 
     def clearNodes(self):

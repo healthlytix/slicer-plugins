@@ -146,6 +146,7 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         self.greenViewCombobox.connect('currentIndexChanged(const QString&)', self.onGreenViewComboboxChanged)
         self.yellowViewCombobox.connect('currentIndexChanged(const QString&)', self.onYellowViewComboboxChanged)
         self.viewButtonGroup.buttonClicked.connect(self.onViewOrientationChanged)
+        self.roiButtonGroup.buttonClicked.connect(self.onRoiChanged)
 
         ### Logic ###
         self.imagePathsDf = pd.DataFrame()
@@ -154,6 +155,11 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         self.selected_image_ind = None
         self.active_label_fn = None
         self.dataFolders = None
+
+        # temp debug
+        self.imagePathsDf = pd.read_csv('/Users/brian/apps/slicer-plugins/CompareSegs/image_paths.csv')
+        self.imagePathsDf = self.imagePathsDf.set_index('case') 
+        self.updateWidgets()
 
 
     def onRedViewComboboxChanged(self, volName):
@@ -168,8 +174,13 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         self.setSliceViewVolume('Yellow', volName, self.volNodes[volName])
 
 
-    def onViewOrientationChanged(self, button):
+    def onRoiChanged(self, button):
+        print('Change ROI to '+button.text)
+        print('Label number '+self.labelNameToLabelVal(button.text))
+        
 
+    def onViewOrientationChanged(self, button):
+        
         # set orientations
         sliceNodes = slicer.util.getNodesByClass('vtkMRMLSliceNode')
         for sliceNode in sliceNodes:
@@ -203,7 +214,6 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         if file_dialog.exec_():
             labeler_folders = file_dialog.selectedFiles()
             self.imagePathsDf = self.loadImagePathsDataFrame(labeler_folders)
-            print(self.imagePathsDf)
             self.updateWidgets()
 
 
@@ -262,22 +272,6 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         print('Loaded '+str(len(df))+' cases from '+str(len(seg_cols))+' labelers')
         
         return df
-
-
-    def findImageFilesInFolder(self, data_folder):
-        imageFilenamePatterns = self.config['imageFilenamePatterns'].values()
-        folder_ims = [glob(os.path.join(data_folder, im_fn)) for im_fn in imageFilenamePatterns]
-        has_required_ims = all(len(ims)==1 for ims in folder_ims)
-        has_label = len(glob(os.path.join(data_folder, self.config['labelFilenamePattern']))) == 1
-        if has_required_ims and has_label:
-            imageDisplayNames = self.config['imageFilenamePatterns'].keys()
-            im_fns_dict = OrderedDict()
-            for ims, displayName in zip(folder_ims, imageDisplayNames):
-                im_fns_dict[displayName] = ims[0]
-            label_fn = glob(os.path.join(data_folder, self.config['labelFilenamePattern']))[0]
-            return im_fns_dict, label_fn
-        else:
-            return None, None
 
 
     def updateWidgets(self):

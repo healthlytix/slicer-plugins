@@ -112,27 +112,6 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         self.yellowViewCombobox.setCurrentIndex(2)
         dataFormLayout.addRow('Yellow View Image:', self.yellowViewCombobox)
 
-        
-        # #### Segmentation Area ####
-
-        self.segCollapsibleButton = ctk.ctkCollapsibleButton()
-        self.segCollapsibleButton.text = 'Segmentation'
-        self.segCollapsibleButton.collapsed = False
-        self.layout.addWidget(self.segCollapsibleButton)
-
-        # Layout within the dummy collapsible button
-        segFormLayout = qt.QFormLayout(self.segCollapsibleButton)
-        self.segEditorWidget = slicer.qMRMLSegmentEditorWidget()
-        self.segEditorWidget.setMRMLScene(slicer.mrmlScene)
-        segmentEditorNode = slicer.vtkMRMLSegmentEditorNode()
-        slicer.mrmlScene.AddNode(segmentEditorNode)
-        self.segEditorWidget.setMRMLSegmentEditorNode(segmentEditorNode)
-        self.segEditorWidget.enabled = True
-        self.segEditorWidget.setSwitchToSegmentationsButtonVisible(False)
-        self.segEditorWidget.setSegmentationNodeSelectorVisible(False)
-        self.segEditorWidget.setMasterVolumeNodeSelectorVisible(False)
-        self.segEditorWidget.setReadOnly(True)
-        segFormLayout.addRow(self.segEditorWidget)
 
         ## Add vertical spacer to keep widgets near top
         self.layout.addStretch(1)
@@ -152,10 +131,11 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         self.imagePathsDf = pd.DataFrame()
         self.segmentationNode = None
         self.volNodes = OrderedDict()
+        self.segmentations = OrderedDict()
         self.selected_image_ind = None
         self.active_label_fn = None
         self.dataFolders = None
-
+        
         # temp debug
         self.imagePathsDf = pd.read_csv('/Users/brian/apps/slicer-plugins/CompareSegs/image_paths.csv')
         self.imagePathsDf = self.imagePathsDf.set_index('case') 
@@ -175,8 +155,9 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
 
 
     def onRoiChanged(self, button):
+        selectedLabelVal = self.labelNameToLabelVal[button.text]
         print('Change ROI to '+button.text)
-        print('Label number '+self.labelNameToLabelVal(button.text))
+        print('Label number '+selectedLabelVal)
         
 
     def onViewOrientationChanged(self, button):
@@ -354,7 +335,7 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         self.loadVolumesFromFiles(im_fns_dict)
 
         # create segmentation
-        self.createLabelImagesFromFile(seg_fns_dict)
+        self.createSegmentationsFromFilenames(seg_fns_dict)
 
         # set the correct orientation
         sliceNodes = slicer.util.getNodesByClass('vtkMRMLSliceNode')
@@ -401,12 +382,14 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
             return
 
 
-    def createLabelImagesFromFile(self, seg_fns_dict):
+    def createSegmentationsFromFilenames(self, seg_fns_dict):
         print('INFO: CompareSegs.createSegmentationFromFile invoked', seg_fns_dict)
 
-        # create segs as a labelVolume's
-        self.labelmapNodes = {}
+        # create segs
+        self.segmentations = {}
         for labeler_name, seg_fn in seg_fns_dict.items():
+
+            # create labelmap
             if not seg_fn:
                 continue
             labelmapNode = slicer.util.loadLabelVolume(seg_fn)
@@ -415,54 +398,26 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
             if not labelmapNode:
                 print('Failed to load label volume ', seg_fn)
                 continue
-            self.labelmapNodes[labeler_name] = labelmapNode
 
-        # # create segmentation node from labelVolume
-        # self.segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode', 'Tumor Segmentation')
-        # self.segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(list(self.volNodes.values())[0])
-        # self.segmentationNode.CreateDefaultDisplayNodes()
-        # slicer.mrmlScene.AddNode(self.segmentationNode)
-        # slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmapNode, self.segmentationNode)
-        # self.segEditorWidget.setSegmentationNode(self.segmentationNode)
-        # slicer.mrmlScene.RemoveNode(labelmapNode)
+            # create segmentation node from labelVolume
+            segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode', labeler_name+' segmentation')
+            segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(list(self.volNodes.values())[0])
+            # segmentationNode.CreateClosedSurfaceRepresentation()
+            segmentationNode.CreateDefaultDisplayNodes()
+            slicer.mrmlScene.AddNode(segmentationNode)
+            slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmapNode, segmentationNode)
+            slicer.mrmlScene.RemoveNode(labelmapNode)
 
-        # # figure out segment labels
-        # segmentation = self.segmentationNode.GetSegmentation()
-        # integerLabels = np.unique(slicer.util.arrayFromVolume(labelmapNode))
-        # integerLabels = np.delete(integerLabels, np.argwhere(integerLabels==0))  # remove background label
-        # segments = [segmentation.GetNthSegment(segInd) for segInd in range(segmentation.GetNumberOfSegments())]
-        # labelToSegment = {str(label): segment for label, segment in zip(integerLabels, segments)}
-        
-        # # verify that labels in label_fn match those in the config
-        # existingLabelsAreInConfig = [label in self.config['labelNames'] for label in labelToSegment]
-        # if not all(existingLabelsAreInConfig):
-        #     raise ValueError('Some of the integer labels in '+label_fn+' ('+str(labelToSegment.keys())+') '+' are missing from config ('+str(self.config['labelNames'].keys())+')')
+            self.segmentations[labeler_name] = segmentationNode
 
-        # # set colors and names for segments
-        # for labelVal, labelName in self.config['labelNames'].items():
-        #     color = np.array(self.config['labelColors'][labelVal], float) / 255
-        #     if labelVal in labelToSegment:
-        #         try:
-        #             segment = labelToSegment[labelVal]
-        #             labelName = self.config['labelNames'][labelVal]
-        #             segment.SetColor(color)
-        #             segment.SetName(labelName)
-        #             print('INFO: Adding segment for label ', labelVal, ' as ', labelName)
-        #         except KeyError:
-        #             print('ERROR: problem getting label name or color for segment ', labelVal)
-        #             continue
-        #     else:  # label is missing from labelmap, create empty segment
-        #         print('INFO: Adding empty segment for class', labelName)
-        #         segmentation.AddEmptySegment(str(labelVal), labelName, color)
-                
 
     def clearNodes(self):
         print('INFO: CompareSegs.clearNodes invoked')
         for volNode in self.volNodes.values():
             slicer.mrmlScene.RemoveNode(volNode)
-        if self.segmentationNode:
-            slicer.mrmlScene.RemoveNode(self.segmentationNode)
-        self.segmentationNode = None
+        for segmentationNode in self.segmentations.values():
+            if segmentationNode:
+                slicer.mrmlScene.RemoveNode(segmentationNode)
         self.volNodes = OrderedDict()
 
                 

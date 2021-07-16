@@ -68,6 +68,18 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         navigateImagesLayout.addWidget(self.nextImageButton)
         dataFormLayout.addRow(navigateImagesLayout)
 
+        # Widget for selecting ROI
+        dataFormLayout.addRow('', qt.QLabel(''))  # empty row, for spacing
+        selectRoiLayout = qt.QHBoxLayout()
+        self.roiButtonGroup = qt.QButtonGroup(dataFormLayout)
+        for num, label_name in enumerate(self.labelNameToLabelVal):
+            button = qt.QRadioButton(label_name)
+            if num == 0:
+                button.setChecked(True)
+            self.roiButtonGroup.addButton(button)
+            selectRoiLayout.addWidget(button)
+        dataFormLayout.addRow('ROI:', selectRoiLayout)
+
         # Widget for selecting view orientations
         dataFormLayout.addRow('', qt.QLabel(''))  # empty row, for spacing
         selectViewLayout = qt.QHBoxLayout()
@@ -85,6 +97,7 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         dataFormLayout.addRow('Orientation:', selectViewLayout)
 
         # Combobox for red/green/yellow slice views
+        dataFormLayout.addRow('', qt.QLabel(''))  # empty row, for spacing
         imageNames = list(self.config['imageFilenamePatterns'].keys())
         self.redViewCombobox = qt.QComboBox()
         self.redViewCombobox.addItems(imageNames)

@@ -426,11 +426,11 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
             roiMask.SetSpacing(tuple(sitkLabelmap.GetSpacing()))
             roiMask.SetDirection(sitkLabelmap.GetDirection())
             
-            # contourImage = contourExtractor.Execute(roiMask)
-            # contourNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLabelMapVolumeNode", "MRHeadFiltered")
-            # sitkUtils.PushVolumeToSlicer(contourImage, contourNode)
-            # slicer.mrmlScene.AddNode(contourNode)
-            # slicer.mrmlScene.RemoveNode(labelmapNode)
+            contourImage = contourExtractor.Execute(roiMask)
+            contourNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLabelMapVolumeNode", "MRHeadFiltered")
+            sitkUtils.PushVolumeToSlicer(contourImage, contourNode)
+            slicer.mrmlScene.AddNode(contourNode)
+            slicer.mrmlScene.RemoveNode(labelmapNode)
 
             # # create segmentation node from labelVolume
             # segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode', labeler_name+' segmentation')

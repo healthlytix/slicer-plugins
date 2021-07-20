@@ -14,6 +14,15 @@ slicer.util.pip_install('pandas')
 import pandas as pd
 
 
+def numpy_to_sitk_image(numpy_arr, reference_im=None):
+    sitk_im = sitk.GetImageFromArray(numpy_arr)
+    if reference_im:
+        sitk_im.SetOrigin(tuple(reference_im.GetOrigin()))
+        sitk_im.SetSpacing(tuple(reference_im.GetSpacing()))
+        sitk_im.SetDirection(reference_im.GetDirection())
+    return sitk_im
+
+
 def GetSlicerITKReadWriteAddress(nodeObjectOrName):
     """ This function will return the ITK FileIO formatted text address
             so that the image can be read directly from the MRML scene
@@ -72,13 +81,13 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
 
         # Navigate images buttons
         navigateImagesLayout = qt.QHBoxLayout()
-        self.previousImageButton = qt.QPushButton('Previous Case')
-        self.previousImageButton.enabled = False
-        navigateImagesLayout.addWidget(self.previousImageButton)
+        self.previousCaseButton = qt.QPushButton('Previous Case')
+        self.previousCaseButton.enabled = False
+        navigateImagesLayout.addWidget(self.previousCaseButton)
 
-        self.nextImageButton = qt.QPushButton('Next Case')
-        self.nextImageButton.enabled = False
-        navigateImagesLayout.addWidget(self.nextImageButton)
+        self.nextCaseButton = qt.QPushButton('Next Case')
+        self.nextCaseButton.enabled = False
+        navigateImagesLayout.addWidget(self.nextCaseButton)
         dataFormLayout.addRow(navigateImagesLayout)
 
         # Widget for selecting ROI
@@ -132,8 +141,8 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         
         ### connections ###
         self.selectDataButton.clicked.connect(self.onSelectDataButtonPressed)
-        self.previousImageButton.connect('clicked(bool)', self.previousImage)
-        self.nextImageButton.connect('clicked(bool)', self.nextImage)
+        self.previousCaseButton.connect('clicked(bool)', self.previousCase)
+        self.nextCaseButton.connect('clicked(bool)', self.nextCase)
         self.caseComboBox.connect('currentIndexChanged(const QString&)', self.onCaseComboboxChanged)
         self.redViewCombobox.connect('currentIndexChanged(const QString&)', self.onRedViewComboboxChanged)
         self.greenViewCombobox.connect('currentIndexChanged(const QString&)', self.onGreenViewComboboxChanged)
@@ -143,37 +152,42 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
 
         ### Logic ###
         self.imagePathsDf = pd.DataFrame()
-        self.segmentationNode = None
         self.volNodes = OrderedDict()
-        self.segmentations = OrderedDict()
         self.selected_image_ind = None
         self.active_label_fn = None
         self.dataFolders = None
+        self.seg_fns_dict = {}
         
         # TEMP DEBUG
         self.imagePathsDf = pd.read_csv('/Users/brian/apps/slicer-plugins/CompareSegs/image_paths.csv')
         self.imagePathsDf = self.imagePathsDf.set_index('case') 
-        self.updateWidgets()
+        self.addCaseNamesToWidgets()
 
 
     def onRedViewComboboxChanged(self, volName):
+        """Change which image is displayed in the red view"""
         self.setSliceViewVolume('Red', volName, self.volNodes[volName])
 
 
     def onGreenViewComboboxChanged(self, volName):
+        """Change which image is displayed in the green view"""
         self.setSliceViewVolume('Green', volName, self.volNodes[volName])
 
 
     def onYellowViewComboboxChanged(self, volName):
+        """Change which image is displayed in the yellow view"""
         self.setSliceViewVolume('Yellow', volName, self.volNodes[volName])
 
 
     def onRoiChanged(self, button):
+        """Swith the visible ROI for all segmentations"""
         self.selectedLabelVal = self.labelNameToLabelVal[button.text]
+        selectedLabelName = self.config['labelNames'][str(self.selectedLabelVal)]
         
 
     def onViewOrientationChanged(self, button):
-        
+        """Change orientation (ax/sag/cor) of all three slice views"""
+
         # set orientations
         sliceNodes = slicer.util.getNodesByClass('vtkMRMLSliceNode')
         for sliceNode in sliceNodes:
@@ -193,6 +207,7 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         
 
     def onSelectDataButtonPressed(self):
+        """Display file selection dialog and load selected paths in a DataFrame"""
         file_dialog = qt.QFileDialog(None, 'Select Data Folders')
         file_dialog.setFileMode(qt.QFileDialog.DirectoryOnly)
         file_dialog.setOption(qt.QFileDialog.DontUseNativeDialog, True)
@@ -207,7 +222,7 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         if file_dialog.exec_():
             labeler_folders = file_dialog.selectedFiles()
             self.imagePathsDf = self.loadImagePathsDataFrame(labeler_folders)
-            self.updateWidgets()
+            self.addCaseNamesToWidgets()
 
 
     def loadImagePathsDataFrame(self, labeler_folders):
@@ -267,7 +282,7 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         return df
 
 
-    def updateWidgets(self):
+    def addCaseNamesToWidgets(self):
         """Load selected valid case names into the widget"""
 
         # select data button
@@ -282,26 +297,26 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
             case_names = list(self.imagePathsDf.index)
             self.caseComboBox.addItems(case_names)  # load names into combobox
             self.caseComboBox.enabled = True
-            self.nextImageButton.enabled = True
-            self.previousImageButton.enabled = True
+            self.nextCaseButton.enabled = True
+            self.previousCaseButton.enabled = True
             self.selected_image_ind = 0
         else:
             self.selectDataButton.setText('Select Data Folders')
             self.caseComboBox.enabled = False
-            self.nextImageButton.enabled = False
-            self.previousImageButton.enabled = False
+            self.nextCaseButton.enabled = False
+            self.previousCaseButton.enabled = False
             self.selected_image_ind = None
             self.active_label_fn = None
 
 
-    def nextImage(self):
+    def nextCase(self):
         self.selected_image_ind += 1
         if self.selected_image_ind > len(self.imagePathsDf) - 1:
             self.selected_image_ind -= len(self.imagePathsDf)
         self.caseComboBox.setCurrentIndex(self.selected_image_ind)
 
 
-    def previousImage(self):
+    def previousCase(self):
         self.selected_image_ind -= 1
         if self.selected_image_ind < 0:
             self.selected_image_ind += len(self.imagePathsDf)
@@ -312,15 +327,7 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         """Load a new case when the user selects from the cases combobox
 
         This is the main function for loading images from disk, configuring the views, and creating
-        a segmentation with the correct display names/colors.
-
-        Arg:
-            case_name (str): the name of the case (which was derived from the directory name). Should be 
-                a key in ``self.image_label_dict``
-
-        Raises:
-            ValueError: if the config is missing name/color for one of the integer labels in the 
-                label file
+        segmentations with the correct display names/colors.
         """
         
         if len(self.imagePathsDf) == 0:
@@ -371,9 +378,9 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
             self.setSliceViewVolume(color, volName, volNode)
         
 
-    def setSliceViewVolume(self, color, volName, volNode):
-        """Show the given volume in the 'color' slice view"""
-        view = slicer.app.layoutManager().sliceWidget(color)
+    def setSliceViewVolume(self, sliceViewColor, volName, volNode):
+        """Show the given `volNode` in the `sliceViewColor` slice view"""
+        view = slicer.app.layoutManager().sliceWidget(sliceViewColor)
         view.sliceLogic().GetSliceCompositeNode().SetBackgroundVolumeID(volNode.GetID())
         view.sliceLogic().GetSliceCompositeNode().SetLinkedControl(True)
         view.mrmlSliceNode().RotateToVolumePlane(volNode)
@@ -381,6 +388,7 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         
 
     def loadVolumesFromFiles(self, filename_dict):
+        """Read and load images from dict of filenames. Keep references in self.volNodes"""
         self.volNodes = OrderedDict()
         for display_name, filename in filename_dict.items():
             volNode = slicer.util.loadVolume(filename)
@@ -413,7 +421,7 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         self.segmentationNode.CreateDefaultDisplayNodes()
         slicer.mrmlScene.AddNode(self.segmentationNode)
 
-        for labeler_name, seg_fn in seg_fns_dict.items():
+        for seg_num, (labeler_name, seg_fn) in enumerate(seg_fns_dict.items()):
 
             # create labelmap
             if not seg_fn:
@@ -430,11 +438,8 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
             roiMask = (labelmap == self.selectedLabelVal).astype(np.uint8)
 
             # numpy array back to a simpleitk image
-            roiMask = sitk.GetImageFromArray(roiMask)
-            roiMask.SetOrigin(tuple(sitkLabelmap.GetOrigin()))
-            roiMask.SetSpacing(tuple(sitkLabelmap.GetSpacing()))
-            roiMask.SetDirection(sitkLabelmap.GetDirection())
-            
+            roiMask = numpy_to_sitk_image(roiMask, sitkLabelmap) 
+
             # Use ITK filter to produce contour image/node
             contourImage = sitk.BinaryContourImageFilter().Execute(roiMask)
             contourNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLLabelMapVolumeNode', labeler_name+' contours')
@@ -442,26 +447,12 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
             
             # create segmentation node from contour node
             slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(contourNode, self.segmentationNode)
+            slicer.mrmlScene.RemoveNode(contourNode)
 
 
     def clearNodes(self):
-        print('INFO: CompareSegs.clearNodes invoked')
-        for volNode in self.volNodes.values():
-            slicer.mrmlScene.RemoveNode(volNode)
-        for segmentationNode in self.segmentations.values():
-            if segmentationNode:
-                slicer.mrmlScene.RemoveNode(segmentationNode)
-        self.volNodes = OrderedDict()
+        slicer.mrmlScene.Clear(0)
 
-                
+
     def cleanup(self):
-        print('INFO: CompareSegs.cleanup() invoked')
         self.clearNodes()
-
-
-def loadLabelArrayFromFile(labelFilename):
-    """Load raw numpy array from a label image file"""
-    labelmapNode = slicer.util.loadLabelVolume(labelFilename)
-    labelArray = slicer.util.arrayFromVolume(labelmapNode)
-    slicer.mrmlScene.RemoveNode(labelmapNode)
-    return labelArray

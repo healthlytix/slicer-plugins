@@ -398,13 +398,21 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         print('INFO: CompareSegs.createSegmentationFromFile invoked', seg_fns_dict)
 
         selectedLabelName = self.config['labelNames'][str(self.selectedLabelVal)]
+        
+        # TEMP DEBUG
+        self.selectedLabelVal = 2
+        labelName = 'peritumoral edema'
         print('displaying all segs for ROI: ', selectedLabelName)
         print('displaying all segs for value:', self.selectedLabelVal)
 
-        contourExtractor = sitk.BinaryContourImageFilter()
 
         # create segs
         self.segmentations = {}
+        self.segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode', labelName)
+        self.segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(list(self.volNodes.values())[0])
+        self.segmentationNode.CreateDefaultDisplayNodes()
+        slicer.mrmlScene.AddNode(self.segmentationNode)
+
         for labeler_name, seg_fn in seg_fns_dict.items():
 
             # create labelmap
@@ -417,32 +425,23 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
 
             # Create new volume node for output
             sitkLabelmap = sitkUtils.PullVolumeFromSlicer(labelmapNode)
+            slicer.mrmlScene.RemoveNode(labelmapNode)
             labelmap = sitk.GetArrayFromImage(sitkLabelmap)
             roiMask = (labelmap == self.selectedLabelVal).astype(np.uint8)
 
-            # Back to a simpleitk image from the itk image
+            # numpy array back to a simpleitk image
             roiMask = sitk.GetImageFromArray(roiMask)
             roiMask.SetOrigin(tuple(sitkLabelmap.GetOrigin()))
             roiMask.SetSpacing(tuple(sitkLabelmap.GetSpacing()))
             roiMask.SetDirection(sitkLabelmap.GetDirection())
             
-            contourImage = contourExtractor.Execute(roiMask)
-            contourNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLabelMapVolumeNode", "MRHeadFiltered")
+            # Use ITK filter to produce contour image/node
+            contourImage = sitk.BinaryContourImageFilter().Execute(roiMask)
+            contourNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLLabelMapVolumeNode', labeler_name+' contours')
             sitkUtils.PushVolumeToSlicer(contourImage, contourNode)
-            slicer.mrmlScene.AddNode(contourNode)
-            slicer.mrmlScene.RemoveNode(labelmapNode)
-
-            # # create segmentation node from labelVolume
-            # segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode', labeler_name+' segmentation')
-            # segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(list(self.volNodes.values())[0])
-            # segmentationNode.CreateBinaryLabelmapRepresentation()
-            # slicer.mrmlScene.AddNode(segmentationNode)
-            # slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmapNode, segmentationNode)
-            # slicer.mrmlScene.RemoveNode(labelmapNode)
-
-            # self.segmentations[labeler_name] = segmentationNode
-
-            break  # TEMP DEBUG
+            
+            # create segmentation node from contour node
+            slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(contourNode, self.segmentationNode)
 
 
     def clearNodes(self):

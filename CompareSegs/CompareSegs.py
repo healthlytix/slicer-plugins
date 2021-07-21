@@ -17,19 +17,8 @@ import pandas as pd
 COLORS = [
     (1, 0, 0),
     (0, 1, 0),
-    (0, 0, 1),
+    (0, 0, 1)
 ]
-
-
-def GetSlicerITKReadWriteAddress(nodeObjectOrName):
-    """ This function will return the ITK FileIO formatted text address
-            so that the image can be read directly from the MRML scene
-    """
-    myNode = nodeObjectOrName if isinstance(nodeObjectOrName, slicer.vtkMRMLNode) else slicer.util.getNode(nodeObjectOrName)
-    myNodeSceneAddress = myNode.GetScene().GetAddressAsString("").replace('Addr=','')
-    myNodeSceneID = myNode.GetID()
-    myNodeFullITKAddress = 'slicer:' + myNodeSceneAddress + '#' + myNodeSceneID
-    return myNodeFullITKAddress
 
 
 class CompareSegs(ScriptedLoadableModule):
@@ -133,28 +122,6 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         self.yellowViewCombobox.setCurrentIndex(2)
         dataFormLayout.addRow('Yellow View Image:', self.yellowViewCombobox)
 
-        #### Segmentation Area ####
-
-        self.segCollapsibleButton = ctk.ctkCollapsibleButton()
-        self.segCollapsibleButton.text = 'Segmentation'
-        self.segCollapsibleButton.collapsed = False
-        self.layout.addWidget(self.segCollapsibleButton)
-
-        # Layout within the dummy collapsible button
-        segFormLayout = qt.QFormLayout(self.segCollapsibleButton)
-        self.segEditorWidget = slicer.qMRMLSegmentEditorWidget()
-        self.segEditorWidget.setMRMLScene(slicer.mrmlScene)
-        segmentEditorNode = slicer.vtkMRMLSegmentEditorNode()
-        slicer.mrmlScene.AddNode(segmentEditorNode)
-        self.segEditorWidget.setMRMLSegmentEditorNode(segmentEditorNode)
-        self.segEditorWidget.enabled = True
-        self.segEditorWidget.setSwitchToSegmentationsButtonVisible(False)
-        self.segEditorWidget.setSegmentationNodeSelectorVisible(False)
-        self.segEditorWidget.setMasterVolumeNodeSelectorVisible(False)
-        self.segEditorWidget.setReadOnly(True)
-        segFormLayout.addRow(self.segEditorWidget)
-
-
         ## Add vertical spacer to keep widgets near top
         self.layout.addStretch(1)
         
@@ -173,16 +140,8 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         self.imagePathsDf = pd.DataFrame()
         self.volNodes = OrderedDict()
         self.selected_image_ind = None
-        self.active_label_fn = None
-        self.dataFolders = None
         self.seg_fns_dict = {}
         self.segmentationNodes = []
-
-        
-        # TEMP DEBUG
-        self.imagePathsDf = pd.read_csv('/Users/brian/apps/slicer-plugins/CompareSegs/image_paths.csv')
-        self.imagePathsDf = self.imagePathsDf.set_index('case') 
-        self.addCaseNamesToWidgets()
 
 
     def onRedViewComboboxChanged(self, volName):
@@ -332,7 +291,6 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
             self.nextCaseButton.enabled = False
             self.previousCaseButton.enabled = False
             self.selected_image_ind = None
-            self.active_label_fn = None
 
 
     def nextCase(self):
@@ -439,13 +397,15 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
             labeler_color = [float(val) for val in labeler_color]
 
             # read labelmap from file
-            if not seg_fn:
-                continue
-            labelmapNode = slicer.util.loadLabelVolume(seg_fn)
-            if not labelmapNode:
+            try:
+                labelmapNode = slicer.util.loadLabelVolume(seg_fn)
+                if not labelmapNode:
+                    print('Failed to load label volume ', seg_fn)
+                    continue
+            except:
                 print('Failed to load label volume ', seg_fn)
                 continue
-
+            
             # create segmentation for this labeler
             segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode', labeler_name)
             segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(referenceVolnode)
@@ -456,6 +416,7 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
             # display as outlines
             displayNode = segmentationNode.GetDisplayNode()
             displayNode.SetAllSegmentsVisibility2DOutline(True)
+            displayNode.SetOpacity2DOutline(10.)
             displayNode.SetAllSegmentsVisibility2DFill(False)
 
             # set name/color

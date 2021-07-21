@@ -101,7 +101,6 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
                 button.setChecked(True)
             self.roiButtonGroup.addButton(button)
             selectRoiLayout.addWidget(button)
-        self.selectedLabelVal = int(list(self.labelNameToLabelVal.values())[0])
         dataFormLayout.addRow('ROI:', selectRoiLayout)
 
         # Widget for selecting view orientations
@@ -179,6 +178,8 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         self.active_label_fn = None
         self.dataFolders = None
         self.seg_fns_dict = {}
+        self.segmentationNodes = []
+
         
         # TEMP DEBUG
         self.imagePathsDf = pd.read_csv('/Users/brian/apps/slicer-plugins/CompareSegs/image_paths.csv')
@@ -204,6 +205,12 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
     def onRoiChanged(self, button):
         """Swith the visible ROI for all segmentations"""
         self.selectedLabelVal = self.labelNameToLabelVal[button.text]
+        for segmentationNode in self.segmentationNodes:
+            segmentation = segmentationNode.GetSegmentation()
+            selectedSegmentID = segmentation.GetSegmentIdBySegmentName(button.text)
+            displayNode = segmentationNode.GetDisplayNode()
+            displayNode.SetAllSegmentsVisibility(False)  # Hide all segments
+            displayNode.SetSegmentVisibility(selectedSegmentID, True)  # Show specific segment
         
 
     def onViewOrientationChanged(self, button):
@@ -423,18 +430,14 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
             return
 
 
+    
+
     def createSegmentationsFromFilenames(self, seg_fns_dict):
         print('INFO: CompareSegs.createSegmentationFromFile invoked', seg_fns_dict)
 
-        selectedLabelName = self.config['labelNames'][self.selectedLabelVal]
         referenceVolnode = list(self.volNodes.values())[0]
-
-        # TEMP DEBUG
-        self.selectedLabelVal = 2
-        labelName = 'peritumoral edema'
-        print('displaying all segs for ROI: ', selectedLabelName)
-        print('displaying all segs for value:', self.selectedLabelVal)
-
+        self.segmentationNodes = []
+    
         # create contour segmentations for each seg file
         for seg_num, (labeler_name, seg_fn) in enumerate(seg_fns_dict.items()):
 
@@ -454,14 +457,11 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
             # create segmentation for this labeler
             segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode', labeler_name)
             segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(referenceVolnode)
+            self.segmentationNodes.append(segmentationNode)
 
             for labelVal, labelName in self.config['labelNames'].items():
                 
                 roiMask = (labelmap == labelVal).astype(np.uint8)
-                if labelVal == self.selectedLabelVal:
-                    print('show', labelVal, 'for', labeler_name)
-                else:
-                    print('hide', labelVal, 'for', labeler_name)
 
                 # numpy array back to simpleitk image
                 roiMask = numpy_to_sitk_image(roiMask, sitkLabelmap) 

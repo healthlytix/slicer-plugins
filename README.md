@@ -21,7 +21,35 @@ This is quite similar to BatchSegmentation, but the segmentations are not editab
 
 ## CompareSegs
 
-Compare multiple segmentations against one another, one ROI at a time.
+Compare multiple segmentations against one another, one ROI at a time. The data is expected to be organized like so:
+
+```
+segmentations
+├── labeler1
+│   ├── case1
+│   │   ├── im1.nii
+│   │   ├── im2.nii
+│   │   └── seg.nii
+...
+│   ├── case2
+│   │   ├── im1.nii
+│   │   ├── im2.nii
+│   │   └── seg.nii
+...
+├── labeler2
+│   ├── case1
+│   │   ├── im1.nii
+│   │   ├── im2.nii
+│   │   └── seg.nii
+...
+│   ├── case2
+│   │   ├── im1.nii
+│   │   ├── im2.nii
+│   │   └── seg.nii
+...
+```
+
+In this example, you'd load the data folders `labeler1` and `labeler2`. For each case, the module will display the 3 image files specified in the config and will create one segmentation for each labeler. Each labeler gets a different color and all ROIs for that labelers segmentation share the same color, so it only makes sense to view one ROI at a time.
 
 # Development
 

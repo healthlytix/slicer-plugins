@@ -416,8 +416,7 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
             # display as outlines
             displayNode = segmentationNode.GetDisplayNode()
             displayNode.SetAllSegmentsVisibility2DOutline(True)
-            displayNode.SetOpacity2DOutline(10.)
-            displayNode.SetAllSegmentsVisibility2DFill(False)
+            displayNode.SetOpacity2DFill(0.2)
 
             # set name/color
             segmentation = segmentationNode.GetSegmentation()
@@ -430,6 +429,7 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
 
         # hide all ROIs except the selected one
         self.onRoiChanged(self.roiButtonGroup.checkedButton())
+
 
     def clearNodes(self):
         slicer.mrmlScene.Clear(0)

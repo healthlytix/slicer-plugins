@@ -57,6 +57,7 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         print('Loading CompareSegs config from ', config_fn)
         with open(config_fn) as f:
             self.config = json.load(f)
+        self.config['labelNames'] = {int(key): val for key, val in self.config['labelNames'].items()}
         self.labelNameToLabelVal = {val: int(key) for key, val in self.config['labelNames'].items()}
 
         #### Data Area ####
@@ -100,7 +101,7 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
                 button.setChecked(True)
             self.roiButtonGroup.addButton(button)
             selectRoiLayout.addWidget(button)
-        self.selectedLabelVal = list(self.labelNameToLabelVal.values())[0]
+        self.selectedLabelVal = int(list(self.labelNameToLabelVal.values())[0])
         dataFormLayout.addRow('ROI:', selectRoiLayout)
 
         # Widget for selecting view orientations
@@ -134,6 +135,27 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         self.yellowViewCombobox.addItems(imageNames)
         self.yellowViewCombobox.setCurrentIndex(2)
         dataFormLayout.addRow('Yellow View Image:', self.yellowViewCombobox)
+
+        #### Segmentation Area ####
+
+        self.segCollapsibleButton = ctk.ctkCollapsibleButton()
+        self.segCollapsibleButton.text = 'Segmentation'
+        self.segCollapsibleButton.collapsed = False
+        self.layout.addWidget(self.segCollapsibleButton)
+
+        # Layout within the dummy collapsible button
+        segFormLayout = qt.QFormLayout(self.segCollapsibleButton)
+        self.segEditorWidget = slicer.qMRMLSegmentEditorWidget()
+        self.segEditorWidget.setMRMLScene(slicer.mrmlScene)
+        segmentEditorNode = slicer.vtkMRMLSegmentEditorNode()
+        slicer.mrmlScene.AddNode(segmentEditorNode)
+        self.segEditorWidget.setMRMLSegmentEditorNode(segmentEditorNode)
+        self.segEditorWidget.enabled = True
+        self.segEditorWidget.setSwitchToSegmentationsButtonVisible(False)
+        self.segEditorWidget.setSegmentationNodeSelectorVisible(False)
+        self.segEditorWidget.setMasterVolumeNodeSelectorVisible(False)
+        self.segEditorWidget.setReadOnly(True)
+        segFormLayout.addRow(self.segEditorWidget)
 
 
         ## Add vertical spacer to keep widgets near top
@@ -182,7 +204,6 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
     def onRoiChanged(self, button):
         """Swith the visible ROI for all segmentations"""
         self.selectedLabelVal = self.labelNameToLabelVal[button.text]
-        selectedLabelName = self.config['labelNames'][str(self.selectedLabelVal)]
         
 
     def onViewOrientationChanged(self, button):
@@ -405,25 +426,19 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
     def createSegmentationsFromFilenames(self, seg_fns_dict):
         print('INFO: CompareSegs.createSegmentationFromFile invoked', seg_fns_dict)
 
-        selectedLabelName = self.config['labelNames'][str(self.selectedLabelVal)]
-        
+        selectedLabelName = self.config['labelNames'][self.selectedLabelVal]
+        referenceVolnode = list(self.volNodes.values())[0]
+
         # TEMP DEBUG
         self.selectedLabelVal = 2
         labelName = 'peritumoral edema'
         print('displaying all segs for ROI: ', selectedLabelName)
         print('displaying all segs for value:', self.selectedLabelVal)
 
-
-        # create segs
-        self.segmentations = {}
-        self.segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode', labelName)
-        self.segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(list(self.volNodes.values())[0])
-        self.segmentationNode.CreateDefaultDisplayNodes()
-        slicer.mrmlScene.AddNode(self.segmentationNode)
-
+        # create contour segmentations for each seg file
         for seg_num, (labeler_name, seg_fn) in enumerate(seg_fns_dict.items()):
 
-            # create labelmap
+            # read labelmap from file
             if not seg_fn:
                 continue
             labelmapNode = slicer.util.loadLabelVolume(seg_fn)
@@ -431,23 +446,34 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
                 print('Failed to load label volume ', seg_fn)
                 continue
 
-            # Create new volume node for output
+            # Read data into numpy
             sitkLabelmap = sitkUtils.PullVolumeFromSlicer(labelmapNode)
             slicer.mrmlScene.RemoveNode(labelmapNode)
             labelmap = sitk.GetArrayFromImage(sitkLabelmap)
-            roiMask = (labelmap == self.selectedLabelVal).astype(np.uint8)
 
-            # numpy array back to a simpleitk image
-            roiMask = numpy_to_sitk_image(roiMask, sitkLabelmap) 
+            # create segmentation for this labeler
+            segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode', labeler_name)
+            segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(referenceVolnode)
 
-            # Use ITK filter to produce contour image/node
-            contourImage = sitk.BinaryContourImageFilter().Execute(roiMask)
-            contourNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLLabelMapVolumeNode', labeler_name+' contours')
-            sitkUtils.PushVolumeToSlicer(contourImage, contourNode)
-            
-            # create segmentation node from contour node
-            slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(contourNode, self.segmentationNode)
-            slicer.mrmlScene.RemoveNode(contourNode)
+            for labelVal, labelName in self.config['labelNames'].items():
+                
+                roiMask = (labelmap == labelVal).astype(np.uint8)
+                if labelVal == self.selectedLabelVal:
+                    print('show', labelVal, 'for', labeler_name)
+                else:
+                    print('hide', labelVal, 'for', labeler_name)
+
+                # numpy array back to simpleitk image
+                roiMask = numpy_to_sitk_image(roiMask, sitkLabelmap) 
+
+                # Use ITK filter to produce contour image/node
+                contourImage = sitk.BinaryContourImageFilter().Execute(roiMask)
+                contourNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLLabelMapVolumeNode', labelName)
+                sitkUtils.PushVolumeToSlicer(contourImage, contourNode)
+                
+                # add contour to segmentation
+                slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(contourNode, segmentationNode)
+                slicer.mrmlScene.RemoveNode(contourNode)
 
 
     def clearNodes(self):

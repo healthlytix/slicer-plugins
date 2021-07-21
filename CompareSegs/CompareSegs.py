@@ -1,9 +1,8 @@
 import os
 import json
 from glob import glob
-import tempfile
-import traceback
 from collections import OrderedDict
+from itertools import cycle
 import numpy as np
 import vtk, qt, ctk, slicer
 import SimpleITK as sitk
@@ -14,13 +13,12 @@ slicer.util.pip_install('pandas')
 import pandas as pd
 
 
-def numpy_to_sitk_image(numpy_arr, reference_im=None):
-    sitk_im = sitk.GetImageFromArray(numpy_arr)
-    if reference_im:
-        sitk_im.SetOrigin(tuple(reference_im.GetOrigin()))
-        sitk_im.SetSpacing(tuple(reference_im.GetSpacing()))
-        sitk_im.SetDirection(reference_im.GetDirection())
-    return sitk_im
+# colors for each *labeler*
+COLORS = [
+    (1, 0, 0),
+    (0, 1, 0),
+    (0, 0, 1),
+]
 
 
 def GetSlicerITKReadWriteAddress(nodeObjectOrName):
@@ -57,8 +55,8 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         print('Loading CompareSegs config from ', config_fn)
         with open(config_fn) as f:
             self.config = json.load(f)
-        self.config['labelNames'] = {int(key): val for key, val in self.config['labelNames'].items()}
-        self.labelNameToLabelVal = {val: int(key) for key, val in self.config['labelNames'].items()}
+        self.config['labels'] = {int(key): val for key, val in self.config['labels'].items()}
+        self.labelNameToLabelVal = {val: int(key) for key, val in self.config['labels'].items()}
 
         #### Data Area ####
 
@@ -430,8 +428,6 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
             return
 
 
-    
-
     def createSegmentationsFromFilenames(self, seg_fns_dict):
         print('INFO: CompareSegs.createSegmentationFromFile invoked', seg_fns_dict)
 
@@ -439,7 +435,8 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
         self.segmentationNodes = []
     
         # create contour segmentations for each seg file
-        for seg_num, (labeler_name, seg_fn) in enumerate(seg_fns_dict.items()):
+        for (labeler_name, seg_fn), labeler_color in zip(seg_fns_dict.items(), cycle(COLORS)):
+            labeler_color = [float(val) for val in labeler_color]
 
             # read labelmap from file
             if not seg_fn:
@@ -449,15 +446,10 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
                 print('Failed to load label volume ', seg_fn)
                 continue
 
-            # Read data into numpy
-            sitkLabelmap = sitkUtils.PullVolumeFromSlicer(labelmapNode)
-            labelmap = sitk.GetArrayFromImage(sitkLabelmap)
-
             # create segmentation for this labeler
             segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode', labeler_name)
             segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(referenceVolnode)
             self.segmentationNodes.append(segmentationNode)
-
             slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmapNode, segmentationNode)
             slicer.mrmlScene.RemoveNode(labelmapNode)
 
@@ -466,24 +458,17 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
             displayNode.SetAllSegmentsVisibility2DOutline(True)
             displayNode.SetAllSegmentsVisibility2DFill(False)
 
-            break
+            # set name/color
+            segmentation = segmentationNode.GetSegmentation()
+            for segmentInd in range(segmentation.GetNumberOfSegments()):
+                segment = segmentation.GetNthSegment(segmentInd)
+                labelVal = int(segment.GetName())
+                labelName = self.config['labels'][labelVal]
+                segment.SetName(labelName)
+                segment.SetColor(labeler_color)
 
-            # for labelVal, labelName in self.config['labelNames'].items():
-                
-            #     roiMask = (labelmap == labelVal).astype(np.uint8)
-
-            #     # numpy array back to simpleitk image
-            #     roiMask = numpy_to_sitk_image(roiMask, sitkLabelmap) 
-
-            #     # Use ITK filter to produce contour image/node
-            #     contourImage = sitk.BinaryContourImageFilter().Execute(roiMask)
-            #     contourNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLLabelMapVolumeNode', labelName)
-            #     sitkUtils.PushVolumeToSlicer(contourImage, contourNode)
-                
-            #     # add contour to segmentation
-            #     slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(contourNode, segmentationNode)
-            #     slicer.mrmlScene.RemoveNode(contourNode)
-
+        # hide all ROIs except the selected one
+        self.onRoiChanged(self.roiButtonGroup.checkedButton())
 
     def clearNodes(self):
         slicer.mrmlScene.Clear(0)

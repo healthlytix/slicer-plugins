@@ -6,7 +6,7 @@
         "T2": "BraTS20_Training_???_t2.nii.gz"
     },
     "segFilenamePattern": "BraTS20_Training_???_initial_seg.nii.gz",
-    "labelNames": {
+    "labels": {
         "1": "necrotic / non-enhancing core",
         "2": "peritumoral edema",
         "3": "enhancing tumor"

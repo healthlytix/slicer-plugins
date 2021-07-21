@@ -451,7 +451,6 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
 
             # Read data into numpy
             sitkLabelmap = sitkUtils.PullVolumeFromSlicer(labelmapNode)
-            slicer.mrmlScene.RemoveNode(labelmapNode)
             labelmap = sitk.GetArrayFromImage(sitkLabelmap)
 
             # create segmentation for this labeler
@@ -459,21 +458,31 @@ class CompareSegsWidget(ScriptedLoadableModuleWidget):
             segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(referenceVolnode)
             self.segmentationNodes.append(segmentationNode)
 
-            for labelVal, labelName in self.config['labelNames'].items():
-                
-                roiMask = (labelmap == labelVal).astype(np.uint8)
+            slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(labelmapNode, segmentationNode)
+            slicer.mrmlScene.RemoveNode(labelmapNode)
 
-                # numpy array back to simpleitk image
-                roiMask = numpy_to_sitk_image(roiMask, sitkLabelmap) 
+            # display as outlines
+            displayNode = segmentationNode.GetDisplayNode()
+            displayNode.SetAllSegmentsVisibility2DOutline(True)
+            displayNode.SetAllSegmentsVisibility2DFill(False)
 
-                # Use ITK filter to produce contour image/node
-                contourImage = sitk.BinaryContourImageFilter().Execute(roiMask)
-                contourNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLLabelMapVolumeNode', labelName)
-                sitkUtils.PushVolumeToSlicer(contourImage, contourNode)
+            break
+
+            # for labelVal, labelName in self.config['labelNames'].items():
                 
-                # add contour to segmentation
-                slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(contourNode, segmentationNode)
-                slicer.mrmlScene.RemoveNode(contourNode)
+            #     roiMask = (labelmap == labelVal).astype(np.uint8)
+
+            #     # numpy array back to simpleitk image
+            #     roiMask = numpy_to_sitk_image(roiMask, sitkLabelmap) 
+
+            #     # Use ITK filter to produce contour image/node
+            #     contourImage = sitk.BinaryContourImageFilter().Execute(roiMask)
+            #     contourNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLLabelMapVolumeNode', labelName)
+            #     sitkUtils.PushVolumeToSlicer(contourImage, contourNode)
+                
+            #     # add contour to segmentation
+            #     slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(contourNode, segmentationNode)
+            #     slicer.mrmlScene.RemoveNode(contourNode)
 
 
     def clearNodes(self):

@@ -57,10 +57,11 @@ I followed [the instructions here](https://na-mic.org/wiki/2013_Project_Week_Bre
 
 Slicer includes a "developer mode" that allows you to reload your module without restarting the application. To turn it on, select from the menu `Edit > Application Settings`, choose "Developer" from the side bar and check the two boxes.
 
-Helpful code snippets: https://www.slicer.org/wiki/Documentation/Nightly/ScriptRepository#Segmentations
+[This page](https://slicer.readthedocs.io/en/latest/developer_guide/script_repository.html) includes many helpful code snippets. Generally, developing in Slicer is pretty painful because the code base is huge, it includes VTK/ITK/Qt (each of which is a complex package), and the slicer tutorials are too basic to be helpful for plugin development.
 
-## TODO
+My approach is generally:
 
-* Give human-readable names to the segments
-* standard seg editor keyboard shortcuts don't work. There's a snippet [here](https://www.slicer.org/wiki/Documentation/Nightly/ScriptRepository#Segmentations) showing how to do this for paint tool
-* Scroll to tumor center?
+* copy one of the existing plugins, remove most of the functionality and give it a new name (find-replace in the code)
+* develop the UI using QT widgets. The UI is defined in your plugin's `setup` function
+* add empty stubs for the callbacks. Make sure clicking the buttons, using dropdowns, etc. work as expected
+* fill in the functionality. You will have to add a lot of `print(type(mysterious_slice_object))` statements and then google to find the [API docs](https://apidocs.slicer.org/master/index.html) for that class. If you're stuck, you can always ask on the [Slicer forum](https://discourse.slicer.org/t/welcome-to-the-3d-slicer-forum/8) -- several of the contributors are pretty active and should have a response in a day or so.

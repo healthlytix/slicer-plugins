@@ -364,6 +364,11 @@ class SegReviewWidget(ScriptedLoadableModuleWidget):
         integerLabels = np.delete(integerLabels, np.argwhere(integerLabels==0))  # remove background label
         segments = [segmentation.GetNthSegment(segInd) for segInd in range(segmentation.GetNumberOfSegments())]
         labelToSegment = {str(label): segment for label, segment in zip(integerLabels, segments)}
+    
+        # display as outlines
+        displayNode = self.segmentationNode.GetDisplayNode()
+        displayNode.SetAllSegmentsVisibility2DOutline(True)
+        displayNode.SetOpacity2DFill(0)
         
         # verify that labels in label_fn match those in the config
         existingLabelsAreInConfig = [label in self.config['labelNames'] for label in labelToSegment]
